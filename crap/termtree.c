@@ -4,14 +4,17 @@
 
 #include "termtree.h"
 #include "string_manip.h"
+#include "string_allocator.h"
 
+static struct termtree_t termtree_create(int level);
 static void termtree_add(struct termtree_t *t, const char* term_str, mathfuncptr op, int reparse);
 static void termtree_resize(struct termtree_t *t);
-static double termtree_gather_result(struct termtree_t *tree);
+static void termtree_destroy(struct termtree_t *t);
+static struct termtree_t tokenize_term(const char* str, int level);
 
-static void term_reparse(struct term_t *term);
 static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
+static struct term_t term_create(const char* str, int reparse);
 
 // misc utils
 static int check_brace_balance(const char* str);
@@ -57,20 +60,24 @@ static int find_matching_parenthesis(const char* str, int par_beg_index) {
 int parse_mathematical_input(const char* str, double *val) {
 
 	char *stripped = strip_all_whitespace(str);
+	if (!check_alphanumeric_validity(stripped)) {
+		sa_free(stripped);
+		return 0;
+	}
 
 	int bb = check_brace_balance(stripped);
 	if (bb != 0) {
 		fprintf(stderr, "error, unmatched parentheses (brace_level = %d)\n", bb);
-		free(stripped);
+		sa_free(stripped);
 		return 0;
 	}
 
-	struct termtree_t t = tokenize_term(stripped, 0);
+	struct term_t t = term_create(str, 1);
 
-	*val = termtree_gather_result(&t);
+	term_get_result(&t, 0);
+	*val = t.value;
 
-	free(stripped);
-	termtree_destroy(&t);
+	sa_free(stripped);
 
 	return 1;
 
@@ -102,9 +109,9 @@ struct term_t term_create(const char* str, int reparse) {
 
 void termtree_destroy(struct termtree_t *t) {
 	int i = 0;
-	for (; i < t->num_terms; ++i) {
-		free(t->terms[i].string);
-	}
+	for (; i < t->num_terms; ++i) 
+		sa_free(t->terms[i].string);
+
 	free(t->terms);
 	free(t->ops);
 }
@@ -154,7 +161,7 @@ struct termtree_t tokenize_term(const char* str, int level) {
 
 		while (str[term_beg_pos] == '(' && str[term_end_pos-1] == ')') {
 			char *subterm_stripped = strip_outer_braces(subterm);
-			free(subterm);
+			sa_free(subterm);
 			subterm = subterm_stripped;
 			++term_beg_pos;
 			--term_end_pos;
@@ -162,7 +169,7 @@ struct termtree_t tokenize_term(const char* str, int level) {
 		}
 
 		termtree_add(&tree, subterm, f, reparse);
-		free(subterm);
+		sa_free(subterm);
 
 		term_beg_pos = i+1;
 	
@@ -172,40 +179,10 @@ struct termtree_t tokenize_term(const char* str, int level) {
 
 }
 
-static void term_reparse(struct term_t *term) {
-	struct termtree_t rptree = tokenize_term(term->string, 0);
-	term->value = termtree_gather_result(&rptree);
-	termtree_destroy(&rptree);
-}
-
 static void term_convert_strtod(struct term_t *term) {
 	char *dummy = NULL;
 	term->value = strtod(term->string, &dummy);
 }
-
-static double termtree_gather_result(struct termtree_t *tree) {
-
-	// assuming termtree_level = 0, ie. +/- 
-
-	int i = 0;
-	for (; i < tree->num_terms; ++i) {
-		if (tree->terms[i].reparse) {
-			term_reparse(&tree->terms[i]);
-		}
-		else {
-			term_get_result(&tree->terms[i], 1);
-		}
-	}
-
-
-	double total = tree->terms[0].value;
-	for (i = 1; i < tree->num_terms; ++i) {
-		total = tree->ops[i-1](total, tree->terms[i].value);
-	}
-	
-	return total;
-}
-
 
 static void term_get_result(struct term_t *term, int level) {
 	struct termtree_t tree = tokenize_term(term->string, level);
@@ -218,16 +195,12 @@ static void term_get_result(struct term_t *term, int level) {
 
 	int i = 0;
 	for (; i < tree.num_terms; ++i) {
-		if (tree.terms[i].reparse) {
-			term_reparse(&tree.terms[i]);
-		} else {
-			if (level >= 2) {
-				term_convert_strtod(&tree.terms[i]);
-			} else {
-				// fcking finally! proper recursion :)
-				term_get_result(&tree.terms[i], level+1);
-			}
-		}
+		struct term_t *cur = &tree.terms[i];
+		if (cur->reparse)
+			term_get_result(cur, 0);
+		
+		else level >= 2 ? term_convert_strtod(cur) : term_get_result(cur, level+1);
+		
 	}
 
 	double result = 0.0;

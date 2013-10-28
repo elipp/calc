@@ -5,9 +5,10 @@
 
 #include "termtree.h"
 #include "string_manip.h"
+#include "string_allocator.h"
 
 int main(int argc, char* argv[]) {
-	static const char* test_expr = "6/3+5-(4+5/35*((3+7)-1*3/5)*(5*33))";
+	static const char* test_expr = "5.53*534-351.53/53*(5+43)";
 
 	double val;
 	if (!parse_mathematical_input(test_expr, &val)) {
@@ -21,6 +22,8 @@ int main(int argc, char* argv[]) {
 	sprintf(bc_buffer, "echo \"%s\" | bc -l", test_expr);
 	fprintf(stderr, "result as calculated by bc: ");
 	system(bc_buffer);
+
+	sa_clearbuf();
 	
 	return 0;
 }
