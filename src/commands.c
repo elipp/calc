@@ -22,64 +22,61 @@ void my(struct wlist_t *wlist) {
 
 	// add variable to user-defined constant list (udc_list)
 	// check that the my-invocation was properly formatted
-	
-	if (wlist->num_words > 1) {
-		// blocks like these could be replaced with some function pointer action
-		if (strcmp(wlist->strings[0], "list") == 0) {
-			my_list();			
+
+	if (wlist->num_words <= 1) {
+		fputs("my: missing argument!\n", stderr);
+		return; 
+	}
+
+	if (strcmp(wlist->strings[0], "list") == 0) {
+		my_list();			
+		return;
+	}
+
+	char *recomposed = wlist_recompose(wlist);
+	size_t recomposed_length = strlen(recomposed);
+
+	// could be retokenized with respect to '='; greatly facilitates parsing
+
+	struct wlist_t retokenized = wlist_generate(recomposed, "=");
+
+	if (retokenized.num_words != 2) { 
+		printf("my: error: exactly 1 \'=\' expected. See \"help my\".\n"); 
+		wlist_destroy(&retokenized);
+		sa_free(recomposed);
+		return;
+	}
+
+	char* varname = wlist->strings[1];	// the second word should be the desired variable name
+	char* valstring = retokenized.strings[1];	// token after the '=' char
+
+	if (LETTER_CHAR_ANY(varname[0])) {
+		fputs("\nmy: error: variable identifiers cannot begin with digits.\n", stderr);
+	}
+	else if (clashes_with_predefined(varname)) {
+		// the call prints its own error message
+	}
+	else {
+		// check if already exists in the udctree.
+		udc_node *search_result = udctree_search(varname);
+		if (!search_result) {
+			udc_node *newnode = malloc(sizeof(udc_node)); 
+			newnode->pair.key = strdup(varname);
+			double_t value = 0;
+			if (!parse_mathematical_input(valstring, &value)) {
+				free(newnode);
+				return; }
+			newnode->pair.value = value;
+			udctree_add(newnode);
 		}
 		else {
-			char *recomposed = wlist_recompose(wlist);
-			size_t recomposed_length = strlen(recomposed);
-
-			// could be retokenized with respect to '='; greatly facilitates parsing
-			
-			struct wlist_t retokenized = wlist_generate(recomposed, "=");
-			
-			if (retokenized.num_words != 2) { 
-				printf("my: error: exactly 1 \'=\' expected. See \"help my\".\n"); 
-				wlist_destroy(&retokenized);
-				sa_free(recomposed);
-				return;
-			}
-			
-			char* varname = wlist->strings[1];	// the second word should be the desired variable name
-			char* valstring = retokenized.strings[1];	// token after the '=' char
-
-			if (LETTER_CHAR_ANY(varname[0])) {
-				fputs("\nmy: error: variable identifiers cannot begin with digits.\n", stderr);
-			}
-			else if (clashes_with_predefined(varname)) {
-					// the call prints its own error message
-			}
-			else {
-				// check if already exists in the udctree.
-				udc_node *search_result = udctree_search(varname);
-				if (!search_result) {
-					udc_node *newnode = malloc(sizeof(udc_node)); 
-					newnode->pair.key = strdup(varname);
-					double_t value = 0;
-					if (!parse_mathematical_input(valstring, &value)) {
-						free(newnode);
-						return; }
-					newnode->pair.value = value;
-					udctree_add(newnode);
-				}
-				else {
-					double_t value = 0;
-					search_result->pair.value = parse_mathematical_input(valstring, &value);
-				}
-			}
-
-			sa_free(recomposed);
-			wlist_destroy(&retokenized);
+			double_t value = 0;
+			search_result->pair.value = parse_mathematical_input(valstring, &value);
 		}
 	}
 
-	else {
-		printf("\nmy: missing operand - see \"help my\".\n");
-	}
-
+	sa_free(recomposed);
+	wlist_destroy(&retokenized);
 }
 
 
