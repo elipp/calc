@@ -1,5 +1,9 @@
 #include "commands.h"
 #include "functions.h"
+#include "wlist.h"
+#include "string_manip.h"
+#include "string_allocator.h"
+#include "termtree.h"
 
 #define PRECSTRING_MAX 128
 
@@ -14,36 +18,36 @@ extern int clashes_with_predefined(const char*);	// from tables.c
 
 int quit_signal = 0;
 
-CMD_MAIN my(word_list *wlist) {
+void my(struct wlist_t *wlist) {
 
 	// add variable to user-defined constant list (udc_list)
 	// check that the my-invocation was properly formatted
 	
 	if (wlist->num_words > 1) {
 		// blocks like these could be replaced with some function pointer action
-		if (strcmp(wlist_get(wlist, 1), "list") == 0) {
+		if (strcmp(wlist->strings[0], "list") == 0) {
 			my_list();			
 		}
 		else {
-			size_t recomposed_length;
-			char *recomposed = wlist_recompose(wlist, &recomposed_length);
+			char *recomposed = wlist_recompose(wlist);
+			size_t recomposed_length = strlen(recomposed);
 
 			// could be retokenized with respect to '='; greatly facilitates parsing
 			
-			word_list *retokenized = wlist_generate(recomposed, "=");
+			struct wlist_t retokenized = wlist_generate(recomposed, "=");
 			
-			if (retokenized->num_words != 2) { 
+			if (retokenized.num_words != 2) { 
 				printf("my: error: exactly 1 \'=\' expected. See \"help my\".\n"); 
-				wlist_delete(&retokenized);
-				free(recomposed);
+				wlist_destroy(&retokenized);
+				sa_free(recomposed);
 				return;
 			}
 			
-			char* varname = wlist_get(wlist, 1);	// the second word should be the desired variable name
-			char* valstring = wlist_get(retokenized, 1);	// token after the '=' char
+			char* varname = wlist->strings[1];	// the second word should be the desired variable name
+			char* valstring = retokenized.strings[1];	// token after the '=' char
 
-			if (IS_DIGIT(varname[0])) {
-				printf("\nmy: error: variable identifiers cannot begin with digits.\n");
+			if (LETTER_CHAR_ANY(varname[0])) {
+				fputs("\nmy: error: variable identifiers cannot begin with digits.\n", stderr);
 			}
 			else if (clashes_with_predefined(varname)) {
 					// the call prints its own error message
@@ -54,16 +58,21 @@ CMD_MAIN my(word_list *wlist) {
 				if (!search_result) {
 					udc_node *newnode = malloc(sizeof(udc_node)); 
 					newnode->pair.key = strdup(varname);
-					newnode->pair.value = parse_mathematical_input(valstring);
+					double_t value = 0;
+					if (!parse_mathematical_input(valstring, &value)) {
+						free(newnode);
+						return; }
+					newnode->pair.value = value;
 					udctree_add(newnode);
 				}
 				else {
-					search_result->pair.value = parse_mathematical_input(valstring);
+					double_t value = 0;
+					search_result->pair.value = parse_mathematical_input(valstring, &value);
 				}
 			}
 
-			free(recomposed);
-			wlist_delete(&retokenized);
+			sa_free(recomposed);
+			wlist_destroy(&retokenized);
 		}
 	}
 
@@ -74,7 +83,7 @@ CMD_MAIN my(word_list *wlist) {
 }
 
 
-CMD_SUB my_list() {
+void my_list() {
 	int i = 0;
 	udc_node *iter = udctree_get_root();
 	if (iter) {
@@ -91,7 +100,7 @@ CMD_SUB my_list() {
 	}
 }
 
-CMD_MAIN help(word_list *wlist) {
+void help(struct wlist_t *wlist) {
 
 	if (wlist->num_words == 1) {
 	printf(
@@ -107,7 +116,7 @@ Try \"help functions\" for a list of supported functions,\n\
 \n");
 	} else {
 		if (wlist->num_words == 2) {
-			const char *keyword = wlist_get(wlist, 1);
+			const char *keyword = wlist->strings[1];
 			// the list of help indices is small enough to just do if strcmp...else if
 			if (strcmp(keyword, "functions") == 0) {
 				help_functions();
@@ -125,12 +134,12 @@ Try \"help functions\" for a list of supported functions,\n\
 				printf("\nhelp: unknown help index \"%s\".\n", keyword);
 			}
 		}
-		else { printf("help: trailing character(s) (\"%s...\")\n", wlist_get(wlist,2)); }
+		else { printf("help: trailing character(s) (\"%s...\")\n", wlist->strings[2]); }
 	}
 
 }
 
-CMD_SUB help_functions() {
+void help_functions() {
 
 	static const size_t num_col = 6;
 	// extern size_t functions_table_size
@@ -156,7 +165,7 @@ CMD_SUB help_functions() {
 
 }
 
-CMD_SUB help_constants() {
+void help_constants() {
 
 	// extern size_t constants_table_size
 	printf("\nBuilt-in constants (scientific constants are in SI units):\n\nkey\tvalue\n");
@@ -169,7 +178,7 @@ CMD_SUB help_constants() {
 
 }
 
-CMD_SUB help_my() {
+void help_my() {
 	printf("\n\
 The \"my\" command can be used to add user-defined constants to the program, i.e. to associate\n\
 a string literal, either a single character or an arbitrarily long string, with a particular\n\
@@ -187,33 +196,38 @@ my x = sin((3/4)pi)\n\
 \n");
 }
 
-CMD_SUB help_set() {
+void help_set() {
 	printf("\n\
 The \"set\" command can be used to control calc's inner workings. Available subcommands are:\n\
 	set precision <integer argument>, controls how many decimals are shown in the final result\n\
 \n");
 }
 
-CMD_MAIN set(word_list *wlist) {
+void set(struct wlist_t *wlist) {
 	if (wlist->num_words < 2) {
 		printf("\nset: error: expected subcommand, none supplied\n");
 		return;
 	}
 
-	char *subcommand = wlist_get(wlist, 1);
+	char *subcommand = wlist->strings[1];
 	if (strcmp(subcommand, "precision") == 0) {
 		if (wlist->num_words < 3) { 
 			printf("\nset precision: error: argument expected.\n");
 			return;
 		}
-		char* precstring = wlist_get(wlist, 2);
-		_double_t prec_val = to_double_t(precstring);
-		set_precision((int)prec_val);
+		char* precstring = wlist->strings[2];
+		double_t prec_val = 0;
+		if (!parse_mathematical_input(precstring, &prec_val)) {
+			fprintf(stderr, "set precision: bad arg\n");
+		}
+		else {
+			set_precision((int)prec_val);
+		}
 	}
 
 }
 
-CMD_SUB set_precision(int precision) {
+void set_precision(int precision) {
 	if (precision < 1) { printf("set precision: error: precision requested < 1\n"); return; }
 	if (precision > DEFAULT_PREC) { 
 		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", DEFAULT_PREC); 
@@ -228,7 +242,7 @@ CMD_SUB set_precision(int precision) {
 #endif
 }
 
-CMD_MAIN quit() {
+void quit() {
 	udctree_delete();
 	quit_signal = 1;
 }

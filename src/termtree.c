@@ -6,6 +6,7 @@
 #include "termtree.h"
 #include "string_manip.h"
 #include "string_allocator.h"
+#include "tables.h"
 
 static int errlevel = 0;
 
@@ -18,6 +19,15 @@ static int tokenize_term(const char* str, int level, struct termtree_t *tree);
 static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
+
+double_t to_double_t(const char* arg, char **endptr) { 
+#ifdef C99_AVAILABLE 
+	double_t res = strtold(arg, endptr);	// requires C99
+#else
+	double_t res = strtod(arg, endptr);
+#endif
+	return res;
+}
 
 // misc helpers 
 static int check_parenthesis_balance(const char* str);
@@ -190,14 +200,17 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 		const char *name;
 		unary_mathfuncptr fptr;
 	};
-	static const struct func_str_pair funcs[] = { {"sin(", sin}, {"cos(", cos}, {"tan(", tan} };
 
 	int i = 0;
-	for (; i < sizeof(funcs)/sizeof(funcs[0]); ++i) {
+	for (; i < functions_table_size; ++i) {
 		char *b;
-		if ((b = strstr(term->string, funcs[i].name)) == &term->string[0]) {
-			fprintf(stderr, "term \"%s\": function match: %s\n", term->string, funcs[i].name);
-			int opening_par_pos = strlen(funcs[i].name) - 1;
+		if ((b = strstr(term->string, functions[i].key)) == &term->string[0]) {
+			int opening_par_pos = functions[i].key_len;
+			if (term->string[functions[i].key_len] != '(') {
+				fprintf(stderr, "funcpass: term->string[functions[i].key_len] != \'(\') (is %c)\n", term->string[functions[i].key_len]);
+				errlevel = 1;
+				return 0;
+			}
 			int closing_par_pos = find_matching_parenthesis(term->string, opening_par_pos);
 			int tlen = closing_par_pos - opening_par_pos;
 
@@ -216,7 +229,7 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 			struct term_t arg_term = term_create(argstr, 1);
 			term_get_result(&arg_term, 0);
 			
-			term->value = funcs[i].fptr(arg_term.value);
+			term->value = functions[i].funcptr(arg_term.value);
 			sa_free(argstr);
 
 			return 1;
@@ -231,7 +244,7 @@ static void term_convert_strtod(struct term_t *term) {
 	// do a funtction strcmp pass here
 	if (!term_varfuncid_strcmp_pass(term)) {
 		// no matches->strtod.
-		double val = strtod(term->string, &endptr);
+		double_t val = to_double_t(term->string, &endptr);
 		if (endptr != term->string + strlen(term->string)) {
 			fprintf(stderr, "syntax error: strtod(\"%s\"): only %d first char(s) used in str->double conversion!\n", term->string, (int)(endptr - term->string));
 			errlevel = 1;
@@ -256,15 +269,15 @@ static void term_get_result(struct term_t *term, int level) {
 		fprintf(stderr, "WARNING: term tokenization failed!\n");
 		term->value = 0;
 		termtree_destroy(&tree);
-		errlevel = 1;
+		//errlevel = 1;
 		return;
 	}
 
-	if (tree.num_terms == 0) {
+	else if (tree.num_terms == 0) {
 		fprintf(stderr, "WARNING: tree.num_terms == 0!\n");
 		term->value = 0;
 		termtree_destroy(&tree);
-		errlevel = 1;
+		// errlevel = 1;
 		return;
 	}
 

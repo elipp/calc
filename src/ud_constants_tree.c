@@ -61,7 +61,7 @@ udc_node *udctree_search(const char* term) {
 	
 }
 
-udc_node *udc_node_create(const char* term, _double_t value) {
+udc_node *udc_node_create(const char* term, double_t value) {
 	udc_node *node = malloc(sizeof(udc_node));
 	node->pair.key = strdup(term);
 	node->pair.value = value;

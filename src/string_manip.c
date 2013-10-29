@@ -50,6 +50,31 @@ char *strip_surrounding_parentheses(const char* str) {
 	return stripped; 
 }
 
+char *strip_surrounding_whitespace(const char* str) {
+	size_t str_len = strlen(str);
+
+	int beg = 0;
+	while (beg < str_len) {
+		if (str[beg] != ' ') break;
+		++beg;
+	}
+
+	int end = str_len-1;
+	while (end >= 0) {
+		if (str[end] != ' ') break;
+		--end;
+	}
+	
+	int len = end - beg + 1;
+	if (len < 1) {
+		fprintf(stderr, "warning: strip_surrounding_whitespace: root string len < 1!\n");
+		return NULL;
+	}
+
+	char *r = substring(str, beg, len);
+	return r;
+}
+
 int check_alphanumeric_validity(const char* str) {
 	size_t str_len = strlen(str);
 	

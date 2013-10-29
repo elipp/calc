@@ -1,18 +1,38 @@
-#include "definitions.h"
-#include "functions.h"
 #include <string.h>
 
+#include "definitions.h"
+#include "functions.h"
+#include "tables.h"
+
+#define KMP(name, fptr) { name, (sizeof(name)-1), fptr }
+
 #ifdef LONG_DOUBLE_PRECISION
-const key_mathfuncptr_pair functions[] =     { { "cos", cosl }, { "sin", sinl }, { "tan", tanl },
-					     { "acos", acosl }, { "asin", asinl }, { "atan", atanl },
-					     { "exp", expl }, { "ln", logl }, { "log", log10l },
-					     { "sqrt", sqrtl }, { "abs", fabsl }, { "cosh", coshl },
-					     { "sinh", sinhl }, { "tanh", tanhl },{ "acosh", acoshl }, 
-					     { "asinh", asinhl }, { "atanh", atanhl }, 
+
+const key_mathfuncptr_pair functions[] = { 
+	KMP("cos", cosl),
+	KMP("sin", sinl),
+	KMP("tan", tanl),
+        KMP("acos", acosl), 
+	KMP("asin", asinl), 
+	KMP("atan", atanl),
+	KMP("exp", expl), 
+	KMP("ln", logl), 
+	KMP("log", log10l),
+	KMP("sqrt", sqrtl), 
+	KMP("abs", fabsl), 
+	KMP("cosh", coshl),
+	KMP("sinh", sinhl), 
+	KMP("tanh", tanhl), 
+	KMP("acosh", acoshl), 
+	KMP("asinh", asinhl), 
+	KMP("atanh", atanhl), 
+	KMP("deg", func_deg), 
+	KMP("rad", func_rad)
+
 	#ifdef C99_AVAILABLE 
-					     { "gamma", tgammal },
+	, KMP("gamma", tgammal)
 	#endif
-					     { "deg", func_deg }, { "rad", func_rad }
+
 };
 
 const key_constant_pair constants[] = { { "pi",  3.14159265358979323846264338327950288L },
@@ -32,16 +52,31 @@ const key_constant_pair constants[] = { { "pi",  3.14159265358979323846264338327
 
 #else
 
-const key_mathfuncptr_pair functions[] =    { { "cos", cos }, { "sin", sin }, { "tan", tan },
-					     { "acos", acos }, { "asin", asin }, { "atan", atan },
-					     { "exp", exp }, { "ln", log }, { "log", log10 },
-					     { "sqrt", sqrt }, { "abs", fabs },{ "cosh", cosh }, 
-					     { "sinh", sinh }, { "tanh", tanh }, { "acosh", acosh }, 
-					     { "asinh", asinh }, { "atanh", atanh }, 
+const key_mathfuncptr_pair functions[] = { 
+	KMP("cos", cos),
+	KMP("sin", sin),
+	KMP("tan", tan),
+        KMP("acos", acos), 
+	KMP("asin", asin), 
+	KMP("atan", atan),
+	KMP("exp", exp), 
+	KMP("ln", log), 
+	KMP("log", log10),
+	KMP("sqrt", sqrt), 
+	KMP("abs", fabs), 
+	KMP("cosh", cosh),
+	KMP("sinh", sinh), 
+	KMP("tanh", tanh), 
+	KMP("acosh", acosh), 
+	KMP("asinh", asinh), 
+	KMP("atanh", atanh), 
+	KMP("deg", func_deg),
+	KMP("rad", func_rad)
+
 	#ifdef C99_AVAILABLE 
-					     { "gamma", tgamma },
+	, KMP("gamma", tgamma)
 	#endif
-					     { "deg", func_deg }, { "rad", func_rad }
+
 };
 
 const key_constant_pair constants[] = { { "pi",  3.14159265358979323846264338327950288L },

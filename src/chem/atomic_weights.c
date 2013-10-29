@@ -1,5 +1,5 @@
-#include "../definitions.h"
-#include "../utils.h"
+#include "definitions.h"
+#include "utils.h"
 
 // should probably be arranged by frequency of occurrence,
 // i.e. hydrogen, carbon, oxygen, nitrogen, sulfur/sulphur, phosphorus etc.,

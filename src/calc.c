@@ -8,8 +8,11 @@
 #endif
 
 #include "definitions.h"
-#include "tree.h"
-#include "utils.h"
+#include "termtree.h"
+#include "string_manip.h"
+#include "string_allocator.h"
+#include "ud_constants_tree.h"
+#include "wlist.h"
 
 extern char f_precision[];
 
@@ -20,9 +23,9 @@ static const char* welcome = "calc. using long double precision";
 static const char* intfmt = "= \033[1;29m%1.0f\033[m\n";
 static const char* welcome = "calc. using double-precision floating point";
 #endif
-static const size_t typesize = sizeof(_double_t) * 8;
+static const size_t typesize = sizeof(double_t) * 8;
 
-extern _double_t (*floor_ptr)(_double_t);
+extern double_t (*floor_ptr)(double_t);
 
 extern int quit_signal;
 
@@ -38,7 +41,7 @@ int main(int argc, char* argv[]) {
 	printf("%s & the GNU readline library.\n", welcome);
 	#endif
 	
-	char *def_prec = malloc(64);
+	char f_precision[64];
 #ifdef LONG_DOUBLE_PRECISION
 	sprintf(f_precision, "= \033[1;29m%%.%dLg\033[m\n", DEFAULT_PREC);
 #else
@@ -55,20 +58,22 @@ int main(int argc, char* argv[]) {
 		input = readline("");
 		#endif
 		if (!input) continue;	// to counter ^A^D (ctrl+A ctrl+D) segfault
-		const size_t input_length = strlen(input);
-		char *input_stripped = strip_surrounding_whitespace(strdup(input), input_length);
+		char *input_stripped = strip_surrounding_whitespace(input);
 
 		if (input_stripped) { 
-			word_list *wlist = wlist_generate(input_stripped, " ");
-			int found = wlist_parse_command(wlist);
-			if (found == 0) {
+			struct wlist_t wlist = wlist_generate(input_stripped, " ");
+			int found = 0; //wlist_parse_command(wlist);
+			if (!found) {
 				// no matching command was found, parse as mathematical input 
 				// -> all whitespace can now be filtered, to simplify parsing
 				// This validates invalid expressions such as " 5 + 5 3 51 5 3" though...
 
-				input_stripped = strip_all_whitespace(input, input_length);
 				if (!input_stripped) { goto cont; }	// strip_all_whitespace returns NULL if input is completely whitespace
-				_double_t result = parse_mathematical_input(input_stripped);
+
+				double_t result = 0;
+				if (!parse_mathematical_input(input_stripped, &result)) {
+					goto cont;
+				}
 
 				if (floor_ptr(result) == result) {
 					printf(intfmt, result);
@@ -83,11 +88,12 @@ int main(int argc, char* argv[]) {
 
 			}
 		cont:
-			wlist_delete(&wlist);
+			wlist_destroy(&wlist);
 						
 		}
 
-		free(input_stripped);
+		sa_free(input_stripped);
+		sa_clearbuf();
 	}
 
 	#ifdef NO_GNU_READLINE

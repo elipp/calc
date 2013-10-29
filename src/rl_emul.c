@@ -1,4 +1,5 @@
 #include "rl_emul.h"
+#include "string_allocator.h"
 
 #define TMPBUF_SZ 1024
 
