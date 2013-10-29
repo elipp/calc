@@ -40,9 +40,9 @@ char *substring(const char* str, int beg_pos, int nc) {
 	return sub;
 }
 
-char *strip_outer_braces(const char* str) {
+char *strip_surrounding_parentheses(const char* str) {
 	size_t str_len = strlen(str);
-	char *stripped = sa_alloc(str_len - 2 + 1);	// -2 for the two braces to be deleted, +1 for '\0' :)
+	char *stripped = sa_alloc(str_len - 2 + 1);	// -2 for the two parentheses to be deleted, +1 for '\0' :)
 
 	strncpy(stripped, str+1, str_len-2);
 	stripped[str_len-2] = '\0';

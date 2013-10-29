@@ -1,53 +1,56 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "termtree.h"
 #include "string_manip.h"
 #include "string_allocator.h"
 
+static int errlevel = 0;
+
 static struct termtree_t termtree_create(int level);
 static void termtree_add(struct termtree_t *t, const char* term_str, mathfuncptr op, int reparse);
 static void termtree_resize(struct termtree_t *t);
 static void termtree_destroy(struct termtree_t *t);
-static struct termtree_t tokenize_term(const char* str, int level);
+static int tokenize_term(const char* str, int level, struct termtree_t *tree);
 
 static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
 
-// misc utils
-static int check_brace_balance(const char* str);
-static int find_matching_parenthesis(const char* str, int par_beg_index);
+// misc helpers 
+static int check_parenthesis_balance(const char* str);
+static int find_matching_parenthesis(const char* str, int opening_par_pos);
 
-static int check_brace_balance(const char* str) {
+static int check_parenthesis_balance(const char* str) {
 	size_t str_len = strlen(str);
 
 	int i = 0;
-	int brace_level = 0;
+	int parlevel = 0;
 	for (; i < str_len; ++i) {
-		if (brace_level < 0) { fprintf(stderr, "syntax error: brace_balance < 0 at expr:%d\n", i); return -1; }
+		if (parlevel < 0) { fprintf(stderr, "syntax error: parlevel < 0 at expr:%d\n", i); errlevel = 1; return -1; }
 		char c = str[i];
-		if (c == '(') ++brace_level;		
-		else if (c == ')') --brace_level;		
+		if (c == '(') ++parlevel;		
+		else if (c == ')') --parlevel;		
 	}
 
-	return brace_level;
+	return parlevel;
 }
 
 
-static int find_matching_parenthesis(const char* str, int par_beg_index) {
+static int find_matching_parenthesis(const char* str, int opening_par_pos) {
 
 	size_t str_len = strlen(str);
-	int brace_level = 1;
+	int parlevel = 1;
 
-	int i = par_beg_index+1;
+	int i = opening_par_pos+1;
 	for(; i < str_len; ++i) {
 		char c = str[i];
-		if (c == '(') ++brace_level;		
+		if (c == '(') ++parlevel;		
 		else if (c == ')') {
-			--brace_level;		
-			if (brace_level == 0) {
+			--parlevel;		
+			if (parlevel == 0) {
 				return i;
 			}
 		}
@@ -59,15 +62,17 @@ static int find_matching_parenthesis(const char* str, int par_beg_index) {
 
 int parse_mathematical_input(const char* str, double *val) {
 
+	errlevel = 0;
+
 	char *stripped = strip_all_whitespace(str);
 	if (!check_alphanumeric_validity(stripped)) {
 		sa_free(stripped);
 		return 0;
 	}
 
-	int bb = check_brace_balance(stripped);
-	if (bb != 0) {
-		fprintf(stderr, "error, unmatched parentheses (brace_level = %d)\n", bb);
+	int pb = check_parenthesis_balance(stripped);
+	if (pb != 0) {
+		fprintf(stderr, "error, unmatched parentheses (parlevel = %d)\n", pb);
 		sa_free(stripped);
 		return 0;
 	}
@@ -79,7 +84,7 @@ int parse_mathematical_input(const char* str, double *val) {
 
 	sa_free(stripped);
 
-	return 1;
+	return errlevel == 0;
 
 }
 
@@ -101,7 +106,7 @@ struct termtree_t termtree_create(int level) {
 
 struct term_t term_create(const char* str, int reparse) {
 	struct term_t term;
-	term.string = strdup(str);
+	term.string = sa_strdup(str);
 	term.value = .0f;
 	term.reparse = reparse;
 	return term;
@@ -116,7 +121,7 @@ void termtree_destroy(struct termtree_t *t) {
 	free(t->ops);
 }
 
-struct termtree_t tokenize_term(const char* str, int level) {
+int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 
 	struct level_specific_opfuncs {
 		const char operators[2];
@@ -127,7 +132,7 @@ struct termtree_t tokenize_term(const char* str, int level) {
 	{ {{'+', '-'}, {f_add, f_sub}}, {{'*', '/'}, {f_mul, f_div}}, {{'^', '%'}, {f_pow, f_mod}} };
 
 
-	struct termtree_t tree = termtree_create(level);
+	*tree = termtree_create(level);
 	struct level_specific_opfuncs of = level_ops[level];
 
 	int term_beg_pos = 0;
@@ -141,7 +146,7 @@ struct termtree_t tokenize_term(const char* str, int level) {
 		    && i < term_str_len) {
 			if (c == '(') {
 				int par_end = find_matching_parenthesis(str, i);
-				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d\n", i); return tree; }
+				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d\n", i); return 0; }
 				else i = par_end;	// skip to par_end
 			}
 			++i;
@@ -160,36 +165,106 @@ struct termtree_t tokenize_term(const char* str, int level) {
 		int reparse = 0;
 
 		while (str[term_beg_pos] == '(' && str[term_end_pos-1] == ')') {
-			char *subterm_stripped = strip_outer_braces(subterm);
+			char *subterm_stripped = strip_surrounding_parentheses(subterm);
 			sa_free(subterm);
 			subterm = subterm_stripped;
 			++term_beg_pos;
 			--term_end_pos;
-			reparse = 1;	// had braces -> needs full re-evaluation
+			reparse = 1;	// had parentheses -> needs full re-evaluation
 		}
 
-		termtree_add(&tree, subterm, f, reparse);
+		termtree_add(tree, subterm, f, reparse);
 		sa_free(subterm);
 
 		term_beg_pos = i+1;
 	
 	}
 
-	return tree;
+	return 1;
 
+}
+
+static int term_varfuncid_strcmp_pass(struct term_t *term) {
+	typedef double (*unary_mathfuncptr)(double);
+	struct func_str_pair {
+		const char *name;
+		unary_mathfuncptr fptr;
+	};
+	static const struct func_str_pair funcs[] = { {"sin(", sin}, {"cos(", cos}, {"tan(", tan} };
+
+	int i = 0;
+	for (; i < sizeof(funcs)/sizeof(funcs[0]); ++i) {
+		char *b;
+		if ((b = strstr(term->string, funcs[i].name)) == &term->string[0]) {
+			fprintf(stderr, "term \"%s\": function match: %s\n", term->string, funcs[i].name);
+			int opening_par_pos = strlen(funcs[i].name) - 1;
+			int closing_par_pos = find_matching_parenthesis(term->string, opening_par_pos);
+			int tlen = closing_par_pos - opening_par_pos;
+
+			if (tlen <= 0) { 
+				fprintf(stderr, "parse error: failure extracting function argstr!\n");
+				errlevel = 1;
+				return 0;
+			} else if (closing_par_pos != (strlen(term->string) - 1)) {
+				fprintf(stderr, "syntax error: unexpected char input after argstr closing parenthesis!\n");
+				errlevel = 1;
+				return 0;
+			}
+
+			char *argstr = substring(term->string, opening_par_pos, tlen+1);
+			fprintf(stderr, "argstr = \"%s\"\n", argstr);
+			struct term_t arg_term = term_create(argstr, 1);
+			term_get_result(&arg_term, 0);
+			
+			term->value = funcs[i].fptr(arg_term.value);
+			sa_free(argstr);
+
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 static void term_convert_strtod(struct term_t *term) {
-	char *dummy = NULL;
-	term->value = strtod(term->string, &dummy);
+	char *endptr = NULL;
+	// do a funtction strcmp pass here
+	if (!term_varfuncid_strcmp_pass(term)) {
+		// no matches->strtod.
+		double val = strtod(term->string, &endptr);
+		if (endptr != term->string + strlen(term->string)) {
+			fprintf(stderr, "syntax error: strtod(\"%s\"): only %d first char(s) used in str->double conversion!\n", term->string, (int)(endptr - term->string));
+			errlevel = 1;
+			term->value = 0;
+		}
+
+		else {
+			term->value = val;
+		}
+	}
 }
 
 static void term_get_result(struct term_t *term, int level) {
-	struct termtree_t tree = tokenize_term(term->string, level);
+	
+	if (errlevel > 0) {
+		return;
+	}
+
+	struct termtree_t tree;
+
+	if (!tokenize_term(term->string, level, &tree)) {
+		fprintf(stderr, "WARNING: term tokenization failed!\n");
+		term->value = 0;
+		termtree_destroy(&tree);
+		errlevel = 1;
+		return;
+	}
 
 	if (tree.num_terms == 0) {
 		fprintf(stderr, "WARNING: tree.num_terms == 0!\n");
 		term->value = 0;
+		termtree_destroy(&tree);
+		errlevel = 1;
 		return;
 	}
 
@@ -211,9 +286,7 @@ static void term_get_result(struct term_t *term, int level) {
 	}
 
 	term->value = result;
-
 	termtree_destroy(&tree);
-
 }
 
 

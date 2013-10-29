@@ -29,3 +29,12 @@ void *sa_alloc(size_t size) {
 }
 
 void sa_free(void *mem) {};
+
+char *sa_strdup(const char* str) {
+	size_t str_len = strlen(str);
+
+	char *n = sa_alloc(str_len);
+	strcpy(n, str);
+
+	return n;
+}

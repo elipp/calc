@@ -8,7 +8,7 @@
 #include "string_allocator.h"
 
 int main(int argc, char* argv[]) {
-	static const char* test_expr = "5.53*534-351.53/53*(5+43)";
+	static const char* test_expr = "sin(5+3*5*7oasgsin(60))";
 
 	double val;
 	if (!parse_mathematical_input(test_expr, &val)) {
