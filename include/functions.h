@@ -11,13 +11,19 @@
 
 /* binary operators */
 
-// the binary operators are stubs :P
-double_t func_binary_and(double_t a, double_t b);
-double_t func_binary_or(double_t a, double_t b);
-double_t func_factorial(double_t a);
+#ifdef LONG_DOUBLE_PRECISION
+	#define FLOOR(f) floorl((fp_t)(f))
+#else
+	#define FLOOR(f) floor((fp_t)(f))
+#endif
 
-double_t func_deg(double_t rad);
-double_t func_rad(double_t deg);
+// the binary operators are stubs :P
+fp_t func_binary_and(fp_t a, fp_t b);
+fp_t func_binary_or(fp_t a, fp_t b);
+fp_t func_factorial(fp_t a);
+
+fp_t func_deg(fp_t rad);
+fp_t func_rad(fp_t deg);
 
 
 #endif

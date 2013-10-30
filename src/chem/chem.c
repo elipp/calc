@@ -3,9 +3,9 @@
 #include "string_allocator.h"
 #include "termtree.h"
 
-static double_t get_atomic_mass(const char*, int*);
+static fp_t get_atomic_mass(const char*, int*);
 
-static double_t get_atomic_mass(const char* arg, int *found) {
+static fp_t get_atomic_mass(const char* arg, int *found) {
 
 	int i = 0;
 	while (i < atomic_weight_table_size) {
@@ -26,7 +26,7 @@ static double_t get_atomic_mass(const char* arg, int *found) {
 
 }
 
-double_t func_molar_mass(const char* arg) {
+fp_t func_molar_mass(const char* arg) {
 
 	// the func_pass_get_result passes the inner argument WITH the outer braces included.
 	// also, will need better error handling
@@ -38,7 +38,7 @@ double_t func_molar_mass(const char* arg) {
 	stripped = strip_all_whitespace(stripped);
 	size_t stripped_len = strlen(stripped);	// kinda redundant though
 	size_t i = 0;
-	double_t sum = 0.0;
+	fp_t sum = 0.0;
 
 	while (i < stripped_len) {
 		if (stripped[i] == '(') {
@@ -57,11 +57,11 @@ double_t func_molar_mass(const char* arg) {
 			const size_t par_end = i+1;	// for some reason, this is required
 
 			char *parenthesized = substring(stripped, par_beg, par_end - par_beg);
-			double_t inner_molar_mass = func_molar_mass(parenthesized);
+			fp_t inner_molar_mass = func_molar_mass(parenthesized);
 		
 			++i;
 
-			double_t factor = 1.0;
+			fp_t factor = 1.0;
 			size_t factor_beg_pos = i;
 			while (DIGIT(stripped[i]) && i < stripped_len) {
 				++i;
@@ -70,7 +70,6 @@ double_t func_molar_mass(const char* arg) {
 			if (i != factor_beg_pos) {
 				// trailing digits were found, strtol(d)
 				char *factor_string = substring(stripped, factor_beg_pos, factor_end_pos - factor_beg_pos);
-				double_t f = 0;
 				char *endptr;
 				factor = to_double_t(factor_string, &endptr);
 				sa_free(factor_string);
@@ -92,7 +91,7 @@ double_t func_molar_mass(const char* arg) {
 
 			// find out if there's a digit char trailing the element
 
-			double_t factor = 1.0;
+			fp_t factor = 1.0;
 			size_t factor_beg_pos = i;
 			while (DIGIT(stripped[i]) && i < stripped_len) {
 				++i;
@@ -108,7 +107,7 @@ double_t func_molar_mass(const char* arg) {
 
 			char *elem = substring(stripped, elem_beg_pos, elem_end_pos-elem_beg_pos);
 			int found;
-			double_t elem_molar_mass = get_atomic_mass(elem, &found);
+			fp_t elem_molar_mass = get_atomic_mass(elem, &found);
 			free(elem);
 
 			if (found == 0) {
@@ -132,7 +131,7 @@ char* func_balance_chemeq(const char* arg) {
 	// stub
 	return NULL;
 }
-double_t func_DBE(const char* arg) {	// the acronym "DBE" refers to the term Double Bond Equivalent, which
+fp_t func_DBE(const char* arg) {	// the acronym "DBE" refers to the term Double Bond Equivalent, which
 	// stub
 	return 0;
 }

@@ -10,7 +10,7 @@ typedef struct _ud_constant_node {
 	key_constant_pair pair;
 } udc_node;
 
-udc_node *udc_node_create(const char* term, double_t value);
+udc_node *udc_node_create(const char* term, fp_t value);
 
 void udctree_add(udc_node *node);
 void udctree_delete();

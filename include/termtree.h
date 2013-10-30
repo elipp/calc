@@ -6,7 +6,7 @@
 
 struct term_t {
 	char *string;
-	double_t value;
+	fp_t value;
 	int reparse;
 };
 
@@ -20,7 +20,7 @@ struct termtree_t {
 	int id;	// debug
 };
 
-double_t to_double_t(const char* arg, char **endptr);
-int parse_mathematical_input(const char* str, double_t *val);
+fp_t to_double_t(const char* arg, char **endptr);
+int parse_mathematical_input(const char* str, fp_t *val);
 
 #endif

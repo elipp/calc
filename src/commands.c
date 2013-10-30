@@ -7,7 +7,13 @@
 
 #define PRECSTRING_MAX 128
 
-char f_precision[PRECSTRING_MAX] = { 0 };	// this isn't exactly the place for this, but...
+#ifdef LONG_DOUBLE_PRECISION
+const char *resultfmti = "= \033[1;29m%1.0Lf\033[m\n";
+#else
+const char *resultfmti = "= \033[1;29m%1.0f\033[m\n";
+#endif
+
+char resultfmtd[PRECSTRING_MAX] = { 0 };	
 
 extern const key_mathfuncptr_pair functions[];
 extern const size_t functions_table_size;
@@ -62,7 +68,7 @@ void my(struct wlist_t *wlist) {
 		if (!search_result) {
 			udc_node *newnode = malloc(sizeof(udc_node)); 
 			newnode->pair.key = strdup(varname);
-			double_t value = 0;
+			fp_t value = 0;
 			if (!parse_mathematical_input(valstring, &value)) {
 				free(newnode);
 				return; }
@@ -70,7 +76,7 @@ void my(struct wlist_t *wlist) {
 			udctree_add(newnode);
 		}
 		else {
-			double_t value = 0;
+			fp_t value = 0;
 			search_result->pair.value = parse_mathematical_input(valstring, &value);
 		}
 	}
@@ -213,7 +219,7 @@ void set(struct wlist_t *wlist) {
 			return;
 		}
 		char* precstring = wlist->strings[2];
-		double_t prec_val = 0;
+		fp_t prec_val = 0;
 		if (!parse_mathematical_input(precstring, &prec_val)) {
 			fprintf(stderr, "set precision: bad arg\n");
 		}
@@ -225,17 +231,18 @@ void set(struct wlist_t *wlist) {
 }
 
 void set_precision(int precision) {
+
 	if (precision < 1) { printf("set precision: error: precision requested < 1\n"); return; }
 	if (precision > DEFAULT_PREC) { 
 		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", DEFAULT_PREC); 
 		if (precision > 56) { precision = 50; printf("Clamped precision to 50 decimal places.\n"); }
 	}
-	memset(f_precision, 0, PRECSTRING_MAX);	// perhaps a bit superfluous
+	memset(resultfmtd, 0, PRECSTRING_MAX);	// perhaps a bit superfluous
 
 #ifdef LONG_DOUBLE_PRECISION
-	sprintf(f_precision, "= \033[1;29m%%.%dLg\033[m\n", precision);
+	sprintf(resultfmtd, "= \033[1;29m%%.%dLg\033[m\n", precision);
 #else
-	sprintf(f_precision, "= \033[1;29m%%.%dg\033[m\n", precision);
+	sprintf(resultfmtd, "= \033[1;29m%%.%dg\033[m\n", precision);
 #endif
 }
 

@@ -5,26 +5,26 @@
 
 #ifdef LONG_DOUBLE_PRECISION
 #define DEFAULT_PREC 16
-typedef long double double_t;
+typedef long double fp_t;
 #else
 #define DEFAULT_PREC 10
-typedef double double_t;
+typedef double fp_t;
 #endif 
 
 typedef struct {
 	const char* key;
 	size_t key_len;
-	double_t (*funcptr)(double_t);
+	fp_t (*funcptr)(fp_t);
 } key_mathfuncptr_pair;
 
 typedef struct {
 	char* key;
-	double_t value;
+	fp_t value;
 } key_constant_pair;
 
 typedef struct {
 	const char* key;
-	double_t (*funcptr)(const char*);
+	fp_t (*funcptr)(const char*);
 } key_strfuncptr_pair;
 
 typedef struct {
@@ -33,7 +33,7 @@ typedef struct {
 } key_funcptr_pair;
 
 
-double_t func_pass_get_result(const char*, size_t, int*);
-double_t constant_pass_get_result(const char*, size_t);
+fp_t func_pass_get_result(const char*, size_t, int*);
+fp_t constant_pass_get_result(const char*, size_t);
 
 #endif

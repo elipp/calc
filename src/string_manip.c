@@ -11,7 +11,7 @@ char *strip_all_whitespace(const char *str) {
 	int i = 0;
 	int index = 0;
 	for (; i < str_len; ++i) {
-		if (str[i] != ' ') stripped[index++] = str[i];
+		if (str[i] != ' ' && str[i] != '\n') stripped[index++] = str[i];
 	}
 
 	stripped[index] = '\0';

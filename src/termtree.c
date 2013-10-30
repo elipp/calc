@@ -20,11 +20,11 @@ static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
 
-double_t to_double_t(const char* arg, char **endptr) { 
+fp_t to_double_t(const char* arg, char **endptr) { 
 #ifdef C99_AVAILABLE 
-	double_t res = strtold(arg, endptr);	// requires C99
+	fp_t res = strtold(arg, endptr);	// requires C99
 #else
-	double_t res = strtod(arg, endptr);
+	fp_t res = strtod(arg, endptr);
 #endif
 	return res;
 }
@@ -70,11 +70,12 @@ static int find_matching_parenthesis(const char* str, int opening_par_pos) {
 	
 }
 
-int parse_mathematical_input(const char* str, double *val) {
+int parse_mathematical_input(const char* str, fp_t *val) {
 
 	errlevel = 0;
 
 	char *stripped = strip_all_whitespace(str);
+
 	if (!check_alphanumeric_validity(stripped)) {
 		sa_free(stripped);
 		return 0;
@@ -87,7 +88,7 @@ int parse_mathematical_input(const char* str, double *val) {
 		return 0;
 	}
 
-	struct term_t t = term_create(str, 1);
+	struct term_t t = term_create(stripped, 1);
 
 	term_get_result(&t, 0);
 	*val = t.value;
@@ -244,7 +245,7 @@ static void term_convert_strtod(struct term_t *term) {
 	// do a funtction strcmp pass here
 	if (!term_varfuncid_strcmp_pass(term)) {
 		// no matches->strtod.
-		double_t val = to_double_t(term->string, &endptr);
+		fp_t val = to_double_t(term->string, &endptr);
 		if (endptr != term->string + strlen(term->string)) {
 			fprintf(stderr, "syntax error: strtod(\"%s\"): only %d first char(s) used in str->double conversion!\n", term->string, (int)(endptr - term->string));
 			errlevel = 1;

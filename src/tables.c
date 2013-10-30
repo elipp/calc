@@ -26,6 +26,8 @@ const key_mathfuncptr_pair functions[] = {
 	KMP("acosh", acoshl), 
 	KMP("asinh", asinhl), 
 	KMP("atanh", atanhl), 
+	KMP("floor", floorl),
+	KMP("ceil", ceill),
 	KMP("deg", func_deg), 
 	KMP("rad", func_rad)
 
@@ -70,6 +72,8 @@ const key_mathfuncptr_pair functions[] = {
 	KMP("acosh", acosh), 
 	KMP("asinh", asinh), 
 	KMP("atanh", atanh), 
+	KMP("floor", floor),
+	KMP("ceil", ceil),
 	KMP("deg", func_deg),
 	KMP("rad", func_rad)
 

@@ -4,8 +4,8 @@
 #include "../definitions.h"
 #include "atomic_weights.h"
 
-double_t func_molar_mass(const char*);
+fp_t func_molar_mass(const char*);
 char* func_balance_chemeq(const char*);
-double_t func_DBE(const char*);
+fp_t func_DBE(const char*);
 
 #endif

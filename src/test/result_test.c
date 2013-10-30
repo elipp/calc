@@ -5,7 +5,7 @@
 
 typedef struct {
 	char* expr;
-	double_t result;
+	fp_t result;
 } test_t;
 
 // correct results gathered from wolframalpha
@@ -31,7 +31,7 @@ static const test_t tests[] = {
 #define REPORT(got, should_be) do { printf("got\t\t%.14g\nshould be \t%.14g\n\n", got, should_be); } while(0)
 #endif
 
-static const double_t threshold = 0.00001;
+static const fp_t threshold = 0.00001;
 
 int main(int argc, char* argv[]) {
 	static const size_t tests_size = sizeof(tests)/sizeof(tests[0]);
@@ -42,13 +42,13 @@ int main(int argc, char* argv[]) {
 	while (i < tests_size) {
 		printf("expr: \"%s\"\n", tests[i].expr);
 
-		double_t real_res;
+		fp_t real_res;
 		if (!parse_mathematical_input(tests[i].expr, &real_res)) {
 			//nop
 		}
 
 		REPORT(real_res, tests[i].result);
-		double_t delta = tests[i].result - real_res;
+		fp_t delta = tests[i].result - real_res;
 
 		if (fabsl(delta) > threshold) {
 			printf("\033[1;31mFAIL! (result delta exceeded rough threshold value %f!)\033[m\n", (double)threshold);
