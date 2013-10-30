@@ -14,4 +14,4 @@ $CC -g -Wall $DEFINE $INCLUDE $CALC_SOURCES -o calc
 echo ""
 echo "------------------------------------------------"
 echo ""
-# $CC -g -Wall $DEFINE $INCLUDE $RT_SOURCES -o result_test
+$CC -g -Wall $DEFINE $INCLUDE $RT_SOURCES -o result_test

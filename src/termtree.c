@@ -132,6 +132,34 @@ void termtree_destroy(struct termtree_t *t) {
 	free(t->ops);
 }
 
+static int term_has_strippable_parentheses(const char* str) {
+	// this helper func sees whether or not the term string 
+	// is enclosed by respective (same-level) parentheses.
+	
+	size_t str_len = strlen(str);
+
+	if (!(str[0] == '(' && str[str_len-1] == ')')) return 0;
+
+	int i = 1;
+	int parlevel = 1;
+	for (; i < str_len; ++i) {
+		if (str[i] == '(') ++parlevel;
+		if (str[i] == ')') {
+			--parlevel;
+			if (parlevel == 0) {
+				if (i < str_len - 1) {
+					return 0;	// parlevel reached 0 prematurely
+				}
+				else {
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+
+}
+
 int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 
 	struct level_specific_opfuncs {
@@ -157,7 +185,7 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 		    && i < term_str_len) {
 			if (c == '(') {
 				int par_end = find_matching_parenthesis(str, i);
-				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d\n", i); return 0; }
+				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d (expr: \"%s\")\n", i, str); return 0; }
 				else i = par_end;	// skip to par_end
 			}
 			++i;
@@ -175,12 +203,10 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 
 		int reparse = 0;
 
-		while (str[term_beg_pos] == '(' && str[term_end_pos-1] == ')') {
+		if (term_has_strippable_parentheses(subterm)) {
 			char *subterm_stripped = strip_surrounding_parentheses(subterm);
 			sa_free(subterm);
 			subterm = subterm_stripped;
-			++term_beg_pos;
-			--term_end_pos;
 			reparse = 1;	// had parentheses -> needs full re-evaluation
 		}
 
@@ -196,22 +222,13 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 }
 
 static int term_varfuncid_strcmp_pass(struct term_t *term) {
-	typedef double (*unary_mathfuncptr)(double);
-	struct func_str_pair {
-		const char *name;
-		unary_mathfuncptr fptr;
-	};
 
 	int i = 0;
 	for (; i < functions_table_size; ++i) {
 		char *b;
 		if ((b = strstr(term->string, functions[i].key)) == &term->string[0]) {
 			int opening_par_pos = functions[i].key_len;
-			if (term->string[functions[i].key_len] != '(') {
-				fprintf(stderr, "funcpass: term->string[functions[i].key_len] != \'(\') (is %c)\n", term->string[functions[i].key_len]);
-				errlevel = 1;
-				return 0;
-			}
+
 			int closing_par_pos = find_matching_parenthesis(term->string, opening_par_pos);
 			int tlen = closing_par_pos - opening_par_pos;
 
@@ -226,13 +243,19 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 			}
 
 			char *argstr = substring(term->string, opening_par_pos, tlen+1);
-			fprintf(stderr, "argstr = \"%s\"\n", argstr);
 			struct term_t arg_term = term_create(argstr, 1);
 			term_get_result(&arg_term, 0);
 			
 			term->value = functions[i].funcptr(arg_term.value);
 			sa_free(argstr);
 
+			return 1;
+		}
+	}
+
+	for (i = 0; i < constants_table_size; ++i) {
+		if (strcmp(term->string, constants[i].key) == 0) {
+			term->value = constants[i].value;
 			return 1;
 		}
 	}
@@ -275,7 +298,8 @@ static void term_get_result(struct term_t *term, int level) {
 	}
 
 	else if (tree.num_terms == 0) {
-		fprintf(stderr, "WARNING: tree.num_terms == 0!\n");
+		// this is not necessarily an error (the prefixed '-' operator will generate a tree with 0 members)
+		//fprintf(stderr, "WARNING: tree.num_terms == 0!\n");
 		term->value = 0;
 		termtree_destroy(&tree);
 		// errlevel = 1;

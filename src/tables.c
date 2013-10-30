@@ -4,7 +4,7 @@
 #include "functions.h"
 #include "tables.h"
 
-#define KMP(name, fptr) { name, (sizeof(name)-1), fptr }
+#define KMP(name, fptr) { name "(", (sizeof(name)-1), fptr }
 
 #ifdef LONG_DOUBLE_PRECISION
 
