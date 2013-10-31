@@ -7,6 +7,8 @@
 #include "string_manip.h"
 #include "string_allocator.h"
 #include "tables.h"
+#include "ud_constants_tree.h"
+#include "functions.h"
 
 static int errlevel = 0;
 
@@ -20,9 +22,9 @@ static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
 
-fp_t to_double_t(const char* arg, char **endptr) { 
+inline fp_t to_double_t(const char* arg, char **endptr) { 
 #ifdef C99_AVAILABLE 
-	fp_t res = strtold(arg, endptr);	// requires C99
+	fp_t res = strtold(arg, endptr);
 #else
 	fp_t res = strtod(arg, endptr);
 #endif
@@ -268,6 +270,12 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 		}
 	}
 
+	struct udc_node *n = udctree_search(term->string);
+	if (n) {
+		term->value = n->pair.value;
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -277,8 +285,8 @@ static void term_convert_strtod(struct term_t *term) {
 	if (!term_varfuncid_strcmp_pass(term)) {
 		// no matches->strtod.
 		fp_t val = to_double_t(term->string, &endptr);
-		if (endptr != term->string + strlen(term->string)) {
-			fprintf(stderr, "syntax error: strtod(\"%s\"): only %d first char(s) used in str->double conversion!\n", term->string, (int)(endptr - term->string));
+		if (endptr < term->string + strlen(term->string)) {
+			fprintf(stderr, "syntax error: \"%s\": unknown identifier!\n", term->string);
 			errlevel = 1;
 			term->value = 0;
 		}

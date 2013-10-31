@@ -147,8 +147,7 @@ int main(int argc, char* argv[]) {
 #endif
 	char *input;
 
-	udc_node *ans = udc_node_create("ans", 0);
-	udctree_add(ans);
+	struct udc_node *ans = udctree_add("ans", 0);
 
 	while (quit_signal == 0) {
 		#ifdef NO_GNU_READLINE

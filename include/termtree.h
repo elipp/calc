@@ -1,7 +1,7 @@
 #ifndef TERMTREE_H
 #define TERMTREE_H
 
-#include "mathstuff.h"
+#include "functions.h"
 #include "definitions.h"
 
 struct term_t {

@@ -6,18 +6,16 @@
 #include "definitions.h"
 #include "tables.h"
 
-typedef struct _ud_constant_node {
-	struct _ud_constant_node *next;
+struct udc_node {
+	struct udc_node *next;
 	key_constant_pair pair;
-} udc_node;
+};
 
-udc_node *udc_node_create(const char* term, fp_t value);
-
-void udctree_add(udc_node *node);
+struct udc_node *udctree_add(const char* key, fp_t value);
 void udctree_delete();
 size_t udctree_get_num_nodes();
-udc_node *udctree_search(const char* term);
-udc_node *udctree_get_root();
+struct udc_node *udctree_search(const char* term);
+struct udc_node *udctree_get_root();
 key_constant_pair *udctree_match(const char* term);
 
 #endif

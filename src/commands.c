@@ -41,7 +41,6 @@ void my(struct wlist_t *wlist) {
 
 	char *recomposed = wlist_recompose(wlist);
 
-	// could be retokenized with respect to '='; greatly facilitates parsing
 	struct wlist_t retokenized = wlist_generate(recomposed, "=");
 
 	if (retokenized.num_words != 2) { 
@@ -52,14 +51,17 @@ void my(struct wlist_t *wlist) {
 	}
 
 	// this is admittedly crappy, but at least it reuses existing code :D
+	// the purpose of this is to tidy up the input string into a more suitable format.
+	// "  my    x=            5    * 5    " -> "my x = 5*5"
+
 	char *rerecomposed = wlist_recompose(&retokenized);
-	struct wlist_t reretokenized = wlist_generate(rerecomposed, " ");
+	struct wlist_t wlist_tidy  = wlist_generate(rerecomposed, " ");
 	
+	char* varname = sa_strdup(wlist_tidy.strings[1]);	
+	char* valstring = sa_strdup(retokenized.strings[1]);	// token after the '=' char
 
-	char* varname = reretokenized.strings[1];	
-	char* valstring = retokenized.strings[1];	// token after the '=' char
-	fprintf(stderr, "varname: \"%s\", valstring: \"%s\"\n", varname, valstring);
-
+	wlist_destroy(&retokenized);
+	wlist_destroy(&wlist_tidy);
 
 	if (DIGIT(varname[0])) {
 		fputs("\nmy: error: variable identifiers cannot begin with digits.\n", stderr);
@@ -69,17 +71,12 @@ void my(struct wlist_t *wlist) {
 	}
 	else {
 		// check if already exists in the udctree.
-		udc_node *search_result = udctree_search(varname);
+		struct udc_node *search_result = udctree_search(varname);
 		if (!search_result) {
-			udc_node *newnode = malloc(sizeof(udc_node)); 
-			newnode->pair.key = strdup(varname);
 			fp_t value = 0;
-			if (!parse_mathematical_input(valstring, &value)) {
-				free(newnode);
-				return; 
+			if (parse_mathematical_input(valstring, &value)) {
+				udctree_add(varname, value); 
 			}
-			newnode->pair.value = value;
-			udctree_add(newnode); // TODO: change prototype to udctree_add(const char*, fp_t)!
 		}
 		else {
 			fp_t value = 0;
@@ -90,14 +87,12 @@ void my(struct wlist_t *wlist) {
 	}
 
 	sa_free(recomposed);
-	wlist_destroy(&reretokenized);
-	wlist_destroy(&retokenized);
 }
 
 
 void my_list(struct wlist_t *list) {
 	int i = 0;
-	udc_node *iter = udctree_get_root();
+	struct udc_node *iter = udctree_get_root();
 	if (iter) {
 		printf("\nUser-defined constants:\n\nkey\tvalue\n");
 		while (iter) {

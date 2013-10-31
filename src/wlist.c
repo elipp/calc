@@ -60,8 +60,6 @@ char *wlist_recompose(struct wlist_t *list) {
 	char *str = sa_alloc(total_length*sizeof(char));
 	memset(str, '\0', total_length);
 
-	wlist_print(list);
-
 	int i = 0;
 	for (; i < list->num_words; ++i) {
 		strcat(str, list->strings[i]);
@@ -87,7 +85,6 @@ int wlist_parse_command(struct wlist_t *list) {
 	int i = 0;
 	for (; i < commands_table_size; ++i) {
 		if (strcmp(list->strings[0], commands[i].key) == 0) {
-			fprintf(stderr, "wlist_parse_command: match found! (\"%s\")\n", commands[i].key);
 			commands[i].func(list);
 			return 1;
 		}

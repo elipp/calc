@@ -1,6 +1,6 @@
 #include "string_manip.h"
 #include "string_allocator.h"
-#include "mathstuff.h"
+#include "functions.h"
 
 char *strip_all_whitespace(const char *str) {
 
