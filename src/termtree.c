@@ -85,7 +85,7 @@ int parse_mathematical_input(const char* str, fp_t *val) {
 
 	int pb = check_parenthesis_balance(stripped);
 	if (pb != 0) {
-		fprintf(stderr, "error, unmatched parentheses (parlevel = %d)\n", pb);
+		fprintf(stderr, "syntax error: unmatched parentheses!\n");
 		sa_free(stripped);
 		return 0;
 	}

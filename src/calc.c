@@ -58,6 +58,7 @@ static int read_stdin_piped_input(char** buffer) {
 		char *r = fgets(bmirror, PIPEBUFSZ, stdin);
 		if (r == NULL) { fprintf(stderr, "warning: fgets returned NULL!\n"); }
 		size_t input_len = strlen(bmirror);
+		if (input_len >= 510) { fprintf(stderr, "warning: truncating stdin input to 510 chars.\n"); }
 		bmirror[input_len-1] = '\0';
 		return (int)input_len;
 	}
@@ -79,6 +80,15 @@ static void report_result(fp_t r) {
 	} else { 
 		printf(resultfmtd, r); 
 	}
+}
+
+static void report_result_plain(fp_t r) {
+	if (roughly_equal(r, FLOOR(r))) {
+		printf("%ld\n", (long)r);
+	} else { 
+		printf("%.16Lf\n", r); 
+	}
+
 }
 
 static char *concatenate_argv(int argc, char *argv[]) {
@@ -103,14 +113,10 @@ static char *concatenate_argv(int argc, char *argv[]) {
 
 int main(int argc, char* argv[]) {
 
-	printf("calc %s - using %s (%lu bit width) & %s.\n", 
-	version_string, prec_config, fp_t_size_bits, rl_config);
-
 	set_precision(DEFAULT_PREC);
-
+	
 	char *pipe_buf;
 	if (read_stdin_piped_input(&pipe_buf) > 0) {
-		fprintf(stderr, "reading input from stdin (not entering interactive mode).\n");
 		fp_t result;
 		if (!parse_mathematical_input(pipe_buf, &result)) {
 			fprintf(stderr, "error: parse_mathematical_input failed!\n");
@@ -118,7 +124,7 @@ int main(int argc, char* argv[]) {
 			return 1;
 		}
 		else {
-			report_result(result);
+			report_result_plain(result);
 			free(pipe_buf);
 			return 0;
 		}
@@ -126,7 +132,6 @@ int main(int argc, char* argv[]) {
 
 	else if (argc > 1) {
 		// we presumably are being presented with a mathexpr as command-line argument
-		fprintf(stderr, "reading input from argv (not entering interactive mode).\n");
 		char *argv_collected = concatenate_argv(argc, argv);		
 		fp_t result;
 		if (!parse_mathematical_input(argv_collected, &result)) {
@@ -135,13 +140,16 @@ int main(int argc, char* argv[]) {
 			return 1;
 		}
 		else {
-			report_result(result);
+			report_result_plain(result);
 			free(argv_collected);
 			return 0;
 		}
 	}
 	
+	printf("calc %s - using %s (%lu bit width) & %s.\n", 
+	version_string, prec_config, fp_t_size_bits, rl_config);
 
+	
 #ifdef NO_GNU_READLINE
 	rl_emul_init();
 #endif
@@ -150,45 +158,44 @@ int main(int argc, char* argv[]) {
 	struct udc_node *ans = udctree_add("ans", 0);
 
 	while (quit_signal == 0) {
+
+		sa_clearbuf();
 		#ifdef NO_GNU_READLINE
 		input = rl_emul_readline("");
 		#else
 		input = readline("");
 		#endif
 		if (!input) continue;	// to counter ^A^D (ctrl+A ctrl+D) segfault
-		char *input_stripped = strip_surrounding_whitespace(input);
+		
+		char *input_tidy = strip_surrounding_whitespace(strip_duplicate_whitespace(input));
 
-		if (input_stripped) { 
-			struct wlist_t wlist = wlist_generate(input_stripped, " ");
-			int found = wlist_parse_command(&wlist);
-			if (!found) {
-				// no matching command was found, parse as mathematical input 
-				// -> all whitespace can now be filtered, to simplify parsing
-				// This validates invalid expressions such as " 5 + 5 3 51 5 3" though...
+		if (!input_tidy) { continue; }
+		
+		struct wlist_t wlist = wlist_generate(input_tidy, " ");
+		int found = wlist_parse_command(&wlist);
+		wlist_destroy(&wlist);
 
-				if (!input_stripped) { goto cont; }	// strip_all_whitespace returns NULL if input is completely whitespace
-				fp_t result = 0;
-				if (!parse_mathematical_input(input_stripped, &result)) {
-					goto cont;
-				}
+		if (found) { continue; }
+		
+		// no matching command was found, parse as mathematical input 
+		// -> all whitespace can now be filtered, to simplify parsing
+		// This validates invalid expressions such as " 5 + 5 3 51 5 3" though...
 
-				report_result(result);
-			
-				#ifdef NO_GNU_READLINE
-				rl_emul_hist_add(input_stripped);
-				#else 
-				add_history(input_stripped);
-				#endif 
-				ans->pair.value = result;
-
-			}
-		cont:
-			wlist_destroy(&wlist);
-						
+		fp_t result = 0;
+		if (!parse_mathematical_input(input_tidy, &result)) {
+			continue;	
 		}
 
-		sa_free(input_stripped);
-		sa_clearbuf();
+		report_result(result);
+	
+		#ifdef NO_GNU_READLINE
+		rl_emul_hist_add(strip_all_whitespace(input_tidy));
+		#else 
+		add_history(strip_all_whitespace(input_tidy));
+		#endif 
+
+		ans->pair.value = result;
+
 	}
 
 	#ifdef NO_GNU_READLINE

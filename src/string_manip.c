@@ -4,6 +4,7 @@
 
 char *strip_all_whitespace(const char *str) {
 
+	if (!str) { return NULL; }
 	size_t str_len = strlen(str);
 
 	char *stripped = sa_alloc(str_len); // will allocate more memory than needed
@@ -21,6 +22,7 @@ char *strip_all_whitespace(const char *str) {
 
 char *substring(const char* str, int beg_pos, int nc) {
 
+	if (!str) { return NULL; }
 	size_t str_len = strlen(str);
 	if (!str_len) { return NULL; }
 
@@ -41,6 +43,8 @@ char *substring(const char* str, int beg_pos, int nc) {
 }
 
 char *strip_surrounding_parentheses(const char* str) {
+
+	if (!str) { return NULL; }
 	size_t str_len = strlen(str);
 	
 	char *stripped = substring(str, 1, str_len-2);
@@ -48,6 +52,8 @@ char *strip_surrounding_parentheses(const char* str) {
 }
 
 char *strip_surrounding_whitespace(const char* str) {
+
+	if (!str) { return NULL; }
 	size_t str_len = strlen(str);
 
 	int beg = 0;
@@ -74,6 +80,8 @@ char *strip_surrounding_whitespace(const char* str) {
 
 char *strip_duplicate_whitespace(const char* str) {
 
+	if (!str) { return NULL; }
+
 	size_t str_len = strlen(str);
 	char *s = sa_alloc(str_len); // generally, this will allocate more memory than we actually need
 	memset(s, '\0', str_len);
@@ -93,6 +101,8 @@ char *strip_duplicate_whitespace(const char* str) {
 }
 
 int check_alphanumeric_validity(const char* str) {
+
+	if (!str) { return 1; }
 	size_t str_len = strlen(str);
 	
 	int i = 0;
