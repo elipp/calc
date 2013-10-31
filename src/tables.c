@@ -29,7 +29,8 @@ const key_mathfuncptr_pair functions[] = {
 	KMP("floor", floorl),
 	KMP("ceil", ceill),
 	KMP("deg", func_deg), 
-	KMP("rad", func_rad)
+	KMP("rad", func_rad),
+	KMP("fact", func_factorial)
 
 	#ifdef C99_AVAILABLE 
 	, KMP("gamma", tgammal)
@@ -75,7 +76,8 @@ const key_mathfuncptr_pair functions[] = {
 	KMP("floor", floor),
 	KMP("ceil", ceil),
 	KMP("deg", func_deg),
-	KMP("rad", func_rad)
+	KMP("rad", func_rad),
+	KMP("fact", func_factorial),
 
 	#ifdef C99_AVAILABLE 
 	, KMP("gamma", tgamma)

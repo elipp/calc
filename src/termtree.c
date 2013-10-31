@@ -133,7 +133,7 @@ void termtree_destroy(struct termtree_t *t) {
 }
 
 static int term_has_strippable_parentheses(const char* str) {
-	// this helper func sees whether or not the term string 
+	// this helper func is used to check whether or not the term string 
 	// is enclosed by respective (same-level) parentheses.
 	
 	size_t str_len = strlen(str);
@@ -144,17 +144,12 @@ static int term_has_strippable_parentheses(const char* str) {
 	int parlevel = 1;
 	for (; i < str_len; ++i) {
 		if (str[i] == '(') ++parlevel;
-		if (str[i] == ')') {
-			--parlevel;
-			if (parlevel == 0) {
-				if (i < str_len - 1) {
-					return 0;	// parlevel reached 0 prematurely
-				}
-				else {
-					return 1;
-				}
-			}
+		else if (str[i] == ')') --parlevel;
+
+		if (parlevel == 0) {
+			return (i < str_len-1) ? 0 : 1;
 		}
+		
 	}
 	return 0;
 
@@ -170,8 +165,9 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 	static const struct level_specific_opfuncs level_ops[3] = 
 	{ {{'+', '-'}, {f_add, f_sub}}, {{'*', '/'}, {f_mul, f_div}}, {{'^', '%'}, {f_pow, f_mod}} };
 
-
+	if (!strlen(str)) return 0;
 	*tree = termtree_create(level);
+
 	struct level_specific_opfuncs of = level_ops[level];
 
 	int term_beg_pos = 0;
@@ -185,7 +181,7 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 		    && i < term_str_len) {
 			if (c == '(') {
 				int par_end = find_matching_parenthesis(str, i);
-				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d (expr: \"%s\")\n", i, str); return 0; }
+				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d (expr: \"%s\")\n", i, str); return -1; }
 				else i = par_end;	// skip to par_end
 			}
 			++i;
@@ -193,8 +189,19 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 		}
 
 		int term_end_pos = i;
-
 		int subterm_length = term_end_pos - term_beg_pos;
+
+		if (subterm_length <= 0 && level > 0) {
+			// an expression such as '5++--+-+--+-5' is considered to be syntactically valid,
+			// (hence the level>0 criterion) while '5^*//****///5' isn't.
+
+			fprintf(stderr, "syntax error: multiple consecutive \'*\', \'/\', \'^\' and/or \'%%\'\n");
+			errlevel = 1; 
+			return -1;
+		}
+
+		// TODO: consider an early-out for L0 subterms with length 0.
+
 		char *subterm = substring(str, term_beg_pos, subterm_length);
 
 		mathfuncptr f = NULL;
@@ -204,6 +211,7 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 		int reparse = 0;
 
 		if (term_has_strippable_parentheses(subterm)) {
+			if (strlen(subterm) <= 2) { fprintf(stderr, "syntax error: \"()\"\n"); errlevel = 1; return -1; }
 			char *subterm_stripped = strip_surrounding_parentheses(subterm);
 			sa_free(subterm);
 			subterm = subterm_stripped;
@@ -217,7 +225,7 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 	
 	}
 
-	return 1;
+	return tree->num_terms;
 
 }
 
@@ -265,7 +273,7 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 
 static void term_convert_strtod(struct term_t *term) {
 	char *endptr = NULL;
-	// do a funtction strcmp pass here
+	// do a function strcmp pass here
 	if (!term_varfuncid_strcmp_pass(term)) {
 		// no matches->strtod.
 		fp_t val = to_double_t(term->string, &endptr);
@@ -289,20 +297,18 @@ static void term_get_result(struct term_t *term, int level) {
 
 	struct termtree_t tree;
 
-	if (!tokenize_term(term->string, level, &tree)) {
-		fprintf(stderr, "WARNING: term tokenization failed!\n");
+	int ret;
+	if ((ret = tokenize_term(term->string, level, &tree)) < 0) {
+//		fprintf(stderr, "WARNING: term tokenization failed!\n");
 		term->value = 0;
 		termtree_destroy(&tree);
-		//errlevel = 1;
+		errlevel = 1;
 		return;
-	}
-
-	else if (tree.num_terms == 0) {
-		// this is not necessarily an error (the prefixed '-' operator will generate a tree with 0 members)
-		//fprintf(stderr, "WARNING: tree.num_terms == 0!\n");
+	} 
+	
+	else if (ret == 0) {
+		// a return value of 0 signifies a NULL term string.
 		term->value = 0;
-		termtree_destroy(&tree);
-		// errlevel = 1;
 		return;
 	}
 
