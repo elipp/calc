@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
 
 		if (input_stripped) { 
 			struct wlist_t wlist = wlist_generate(input_stripped, " ");
-			int found = 0; //wlist_parse_command(wlist);
+			int found = wlist_parse_command(&wlist);
 			if (!found) {
 				// no matching command was found, parse as mathematical input 
 				// -> all whitespace can now be filtered, to simplify parsing

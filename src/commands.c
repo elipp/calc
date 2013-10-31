@@ -34,29 +34,34 @@ void my(struct wlist_t *wlist) {
 		return; 
 	}
 
-	if (strcmp(wlist->strings[0], "list") == 0) {
+	if (strcmp(wlist->strings[1], "list") == 0) {
 		my_list();			
 		return;
 	}
 
 	char *recomposed = wlist_recompose(wlist);
-	size_t recomposed_length = strlen(recomposed);
 
 	// could be retokenized with respect to '='; greatly facilitates parsing
-
 	struct wlist_t retokenized = wlist_generate(recomposed, "=");
 
 	if (retokenized.num_words != 2) { 
-		printf("my: error: exactly 1 \'=\' expected. See \"help my\".\n"); 
+		printf("my: error: exactly 1 \'=\' expected (got %d). See \"help my\".\n", retokenized.num_words); 
 		wlist_destroy(&retokenized);
 		sa_free(recomposed);
 		return;
 	}
 
-	char* varname = wlist->strings[1];	// the second word should be the desired variable name
-	char* valstring = retokenized.strings[1];	// token after the '=' char
+	// this is admittedly crappy, but at least it reuses existing code :D
+	char *rerecomposed = wlist_recompose(&retokenized);
+	struct wlist_t reretokenized = wlist_generate(rerecomposed, " ");
+	
 
-	if (LETTER_CHAR_ANY(varname[0])) {
+	char* varname = reretokenized.strings[1];	
+	char* valstring = retokenized.strings[1];	// token after the '=' char
+	fprintf(stderr, "varname: \"%s\", valstring: \"%s\"\n", varname, valstring);
+
+
+	if (DIGIT(varname[0])) {
 		fputs("\nmy: error: variable identifiers cannot begin with digits.\n", stderr);
 	}
 	else if (clashes_with_predefined(varname)) {
@@ -71,22 +76,26 @@ void my(struct wlist_t *wlist) {
 			fp_t value = 0;
 			if (!parse_mathematical_input(valstring, &value)) {
 				free(newnode);
-				return; }
+				return; 
+			}
 			newnode->pair.value = value;
-			udctree_add(newnode);
+			udctree_add(newnode); // TODO: change prototype to udctree_add(const char*, fp_t)!
 		}
 		else {
 			fp_t value = 0;
-			search_result->pair.value = parse_mathematical_input(valstring, &value);
+			if (parse_mathematical_input(valstring, &value)) {
+				search_result->pair.value = value;
+			}
 		}
 	}
 
 	sa_free(recomposed);
+	wlist_destroy(&reretokenized);
 	wlist_destroy(&retokenized);
 }
 
 
-void my_list() {
+void my_list(struct wlist_t *list) {
 	int i = 0;
 	udc_node *iter = udctree_get_root();
 	if (iter) {
@@ -121,6 +130,7 @@ Try \"help functions\" for a list of supported functions,\n\
 		if (wlist->num_words == 2) {
 			const char *keyword = wlist->strings[1];
 			// the list of help indices is small enough to just do if strcmp...else if
+			// TODO: no it isn't
 			if (strcmp(keyword, "functions") == 0) {
 				help_functions();
 			}
@@ -142,7 +152,7 @@ Try \"help functions\" for a list of supported functions,\n\
 
 }
 
-void help_functions() {
+void help_functions(struct wlist_t *wlist) {
 
 	static const size_t num_col = 6;
 	// extern size_t functions_table_size
@@ -168,7 +178,7 @@ void help_functions() {
 
 }
 
-void help_constants() {
+void help_constants(struct wlist_t *wlist) {
 
 	// extern size_t constants_table_size
 	printf("\nBuilt-in constants (scientific constants are in SI units):\n\nkey\tvalue\n");
@@ -181,7 +191,7 @@ void help_constants() {
 
 }
 
-void help_my() {
+void help_my(struct wlist_t *wlist) {
 	printf("\n\
 The \"my\" command can be used to add user-defined constants to the program, i.e. to associate\n\
 a string literal, either a single character or an arbitrarily long string, with a particular\n\
@@ -259,6 +269,5 @@ const key_funcptr_pair commands[] = {
 };
 
 
-const size_t commands_list_size = sizeof(commands)/sizeof(commands[0]); 
-
+const size_t commands_table_size = sizeof(commands)/sizeof(commands[0]); 
 

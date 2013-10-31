@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "definitions.h"
+#include "tables.h"
 
 typedef struct _ud_constant_node {
 	struct _ud_constant_node *next;

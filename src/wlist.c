@@ -3,6 +3,8 @@
 #include "wlist.h"
 #include "string_manip.h"
 #include "string_allocator.h"
+#include "commands.h"
+#include "tables.h"
 
 static void wlist_resize(struct wlist_t *wlist) {
 	wlist->capacity *= 2;
@@ -47,11 +49,9 @@ struct wlist_t wlist_generate(const char* arg, const char* delims) {
 
 void wlist_print(struct wlist_t *list) {
 	int i = 0;
-	fputs("wlist_print dump:\n", stderr);
 	for (; i < list->num_words; ++i) {
 		fprintf(stderr, "\"%s\"\n", list->strings[i]);
 	}
-	fputs("\n", stderr);
 }
 
 char *wlist_recompose(struct wlist_t *list) {
@@ -60,12 +60,16 @@ char *wlist_recompose(struct wlist_t *list) {
 	char *str = sa_alloc(total_length*sizeof(char));
 	memset(str, '\0', total_length);
 
+	wlist_print(list);
+
 	int i = 0;
 	for (; i < list->num_words; ++i) {
 		strcat(str, list->strings[i]);
 		strcat(str, " ");
 	}
+
 	str[total_length-1] = '\0';
+	str = strip_surrounding_whitespace(strip_duplicate_whitespace(str));
 
 	return str;
 }
@@ -76,4 +80,17 @@ void wlist_destroy(struct wlist_t *wlist) {
 	wlist->capacity = 0;
 	wlist->num_words = 0;
 	wlist->total_length = 0;
+}
+
+int wlist_parse_command(struct wlist_t *list) {
+	
+	int i = 0;
+	for (; i < commands_table_size; ++i) {
+		if (strcmp(list->strings[0], commands[i].key) == 0) {
+			fprintf(stderr, "wlist_parse_command: match found! (\"%s\")\n", commands[i].key);
+			commands[i].func(list);
+			return 1;
+		}
+	}
+	return 0;
 }

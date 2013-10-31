@@ -16,6 +16,7 @@ char *strip_all_whitespace(const char* str);
 char *substring(const char* str, int beg_pos, int nc);
 char *strip_surrounding_parentheses(const char* str);
 char *strip_surrounding_whitespace(const char* str);
+char *strip_duplicate_whitespace(const char* str);
 int check_alphanumeric_validity(const char *str);
 
 #endif

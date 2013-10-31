@@ -31,12 +31,11 @@ fp_t func_molar_mass(const char* arg) {
 	// the func_pass_get_result passes the inner argument WITH the outer braces included.
 	// also, will need better error handling
 	
-	const size_t arg_len = strlen(arg);
 	char *stripped = strip_surrounding_parentheses(arg);
-	size_t brace_stripped_len = strlen(stripped);
 	
 	stripped = strip_all_whitespace(stripped);
 	size_t stripped_len = strlen(stripped);	// kinda redundant though
+
 	size_t i = 0;
 	fp_t sum = 0.0;
 

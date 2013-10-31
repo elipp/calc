@@ -42,11 +42,8 @@ char *substring(const char* str, int beg_pos, int nc) {
 
 char *strip_surrounding_parentheses(const char* str) {
 	size_t str_len = strlen(str);
-	char *stripped = sa_alloc(str_len - 2 + 1);	// -2 for the two parentheses to be deleted, +1 for '\0' :)
-
-	strncpy(stripped, str+1, str_len-2);
-	stripped[str_len-2] = '\0';
-
+	
+	char *stripped = substring(str, 1, str_len-2);
 	return stripped; 
 }
 
@@ -73,6 +70,26 @@ char *strip_surrounding_whitespace(const char* str) {
 
 	char *r = substring(str, beg, len);
 	return r;
+}
+
+char *strip_duplicate_whitespace(const char* str) {
+
+	size_t str_len = strlen(str);
+	char *s = sa_alloc(str_len); // generally, this will allocate more memory than we actually need
+	memset(s, '\0', str_len);
+	
+	int i = 0;
+	int index = 0;
+	while (i < str_len) {
+		s[index] = str[i];
+		++index;
+		if (str[i] == ' ') {
+			while (i+1 < str_len && str[i+1] == ' ') ++i;
+		}
+		++i;
+	}
+
+	return s;
 }
 
 int check_alphanumeric_validity(const char* str) {
