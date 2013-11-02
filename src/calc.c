@@ -41,31 +41,32 @@ extern int quit_signal;
 
 static int read_stdin_piped_input(char** buffer) {
 
-	fd_set fds;
-	struct timeval tv;
-	FD_ZERO(&fds);
-	FD_SET(STDIN_FILENO, &fds);
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-
-	int ret = select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
-	if (ret < 0) { fprintf(stderr, "read_stdin_piped_input: select() error\n"); return 0; }
-
-	if (FD_ISSET(STDIN_FILENO, &fds)) {
-		#define PIPEBUFSZ 512
-		*buffer = malloc(PIPEBUFSZ);
-		char *bmirror = *buffer;
-		char *r = fgets(bmirror, PIPEBUFSZ, stdin);
-		if (r == NULL) { fprintf(stderr, "warning: fgets returned NULL!\n"); }
-		size_t input_len = strlen(bmirror);
-		if (input_len >= 510) { fprintf(stderr, "warning: truncating stdin input to 510 chars.\n"); }
-		bmirror[input_len-1] = '\0';
-		return (int)input_len;
-	}
-	else {
+	if (isatty(STDIN_FILENO)) {
+		// thank god for isatty :D
 		return 0;
 	}
+	
+	#define PIPEBUF_CHUNKSIZE (8*1024)
 
+	size_t bufsize = PIPEBUF_CHUNKSIZE;
+	char* b = malloc(bufsize);
+	char *offset = b;
+	int r = -1;
+	size_t total_bytes = 0;
+
+	while ((r = fread(offset, 1, PIPEBUF_CHUNKSIZE, stdin)) > 0) {
+		total_bytes += r;
+		size_t prev_bufsize = bufsize;
+		bufsize += PIPEBUF_CHUNKSIZE;
+		b = realloc(b, bufsize);
+		if (!b) { fprintf(stderr, "realloc error :(\n"); return 0; }
+		offset = b + prev_bufsize;
+	}
+
+	if (total_bytes < 1) { free(b); return total_bytes; }
+	*buffer = b;
+
+	return 1;
 
 }
 
@@ -84,7 +85,7 @@ static void report_result(fp_t r) {
 
 static void report_result_plain(fp_t r) {
 	if (roughly_equal(r, FLOOR(r))) {
-		printf("%ld\n", (long)r);
+		printf("%.1Lf\n", r);
 	} else { 
 		printf("%.16Lf\n", r); 
 	}
