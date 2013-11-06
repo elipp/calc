@@ -7,7 +7,7 @@ char *strip_all_whitespace(const char *str) {
 	if (!str) { return NULL; }
 	size_t str_len = strlen(str);
 
-	char *stripped = sa_alloc(str_len); // will allocate more memory than needed
+	char *stripped = sa_alloc(str_len+1); // will allocate more memory than needed
 
 	int i = 0;
 	int index = 0;
@@ -32,10 +32,13 @@ char *substring(const char* str, int beg_pos, int nc) {
 
 	char *sub = sa_alloc(nc+1);
 
+	/*
 	int i = 0;
 	for (; i < nc; ++i) {
 		sub[i] = str[beg_pos+i];
-	}
+	} 
+	*/
+	strncpy(sub, str+beg_pos, nc);
 
 	sub[nc] = '\0';
 
@@ -57,15 +60,15 @@ char *strip_surrounding_whitespace(const char* str) {
 	size_t str_len = strlen(str);
 
 	int beg = 0;
-	while (beg < str_len) {
-		if (str[beg] != ' ') break;
-		++beg;
+	for (; beg < str_len; ) {
+		if (str[beg] == ' ') ++beg;
+		else break;
 	}
 
 	int end = str_len-1;
-	while (end >= 0) {
-		if (str[end] != ' ') break;
-		--end;
+	for (; end > 0; ) {
+		if (str[end] == ' ') --end;
+		else break;
 	}
 	
 	int len = end - beg + 1;
@@ -83,13 +86,12 @@ char *strip_duplicate_whitespace(const char* str) {
 	if (!str) { return NULL; }
 
 	size_t str_len = strlen(str);
-	char *s = sa_alloc(str_len); // generally, this will allocate more memory than we actually need
-	memset(s, '\0', str_len);
+	char *r = sa_alloc(str_len+1); // generally, this will allocate more memory than we actually need
 	
 	int i = 0;
 	int index = 0;
 	while (i < str_len) {
-		s[index] = str[i];
+		r[index] = str[i];
 		++index;
 		if (str[i] == ' ') {
 			while (i+1 < str_len && str[i+1] == ' ') ++i;
@@ -97,7 +99,9 @@ char *strip_duplicate_whitespace(const char* str) {
 		++i;
 	}
 
-	return s;
+	r[index] = '\0';
+
+	return r;
 }
 
 int check_alphanumeric_validity(const char* str) {

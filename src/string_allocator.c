@@ -91,8 +91,9 @@ void sa_free(void *mem) {};
 char *sa_strdup(const char* str) {
 	size_t str_len = strlen(str);
 
-	char *n = sa_alloc(str_len);
-	strcpy(n, str);
+	char *n = sa_alloc(str_len+1);
+	strncpy(n, str, str_len);
+	n[str_len] = '\0';
 
 	return n;
 }

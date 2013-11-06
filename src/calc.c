@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/select.h>
 
@@ -7,6 +8,7 @@
 #include "rl_emul.h"
 #else
 #include <readline/readline.h>
+#include <readline/history.h>
 #endif
 
 #include "definitions.h"
@@ -77,7 +79,12 @@ static int roughly_equal(fp_t a, fp_t b) {
 
 static void report_result(fp_t r) {
 	if (roughly_equal(r, FLOOR(r))) {
-		printf(resultfmti, r);
+		if (r < 1000000000.0) {
+			printf(resultfmti, r);
+		}
+		else {
+			printf("\033[1;29m= %1.16Lg\033[m\n", r);
+		}
 	} else { 
 		printf(resultfmtd, r); 
 	}
@@ -112,13 +119,29 @@ static char *concatenate_argv(int argc, char *argv[]) {
 	return buffer;
 }
 
+static void cleanup() {
+	#ifdef NO_GNU_READLINE
+	if (rl_emul_initialized()) 
+		rl_emul_deinit();
+	#endif
+}
+
+
+static void sig_handler(int signum) {
+	cleanup();
+	puts("\n");
+	exit(signum);
+}
+
 int main(int argc, char* argv[]) {
 
+	signal(SIGINT, sig_handler);
 	set_precision(DEFAULT_PREC);
 	
 	char *pipe_buf;
 	if (read_stdin_piped_input(&pipe_buf) > 0) {
 		fp_t result;
+		fprintf(stderr, "%s\n", pipe_buf);
 		if (!parse_mathematical_input(pipe_buf, &result)) {
 			fprintf(stderr, "error: parse_mathematical_input failed!\n");
 			free(pipe_buf);
@@ -149,7 +172,6 @@ int main(int argc, char* argv[]) {
 	
 	printf("calc %s - using %s (%lu bit width) & %s.\n", 
 	version_string, prec_config, fp_t_size_bits, rl_config);
-
 	
 #ifdef NO_GNU_READLINE
 	rl_emul_init();
@@ -168,8 +190,7 @@ int main(int argc, char* argv[]) {
 		#endif
 		if (!input) continue;	// to counter ^A^D (ctrl+A ctrl+D) segfault
 		
-		char *input_tidy = strip_surrounding_whitespace(strip_duplicate_whitespace(input));
-
+		char *input_tidy = strip_duplicate_whitespace(strip_surrounding_whitespace(input));
 		if (!input_tidy) { continue; }
 		
 		struct wlist_t wlist = wlist_generate(input_tidy, " ");
@@ -188,14 +209,16 @@ int main(int argc, char* argv[]) {
 		}
 
 		report_result(result);
-	
+		
 		#ifdef NO_GNU_READLINE
-		rl_emul_hist_add(strip_all_whitespace(input_tidy));
+		rl_emul_hist_add(input);
 		#else 
-		add_history(strip_all_whitespace(input_tidy));
+		add_history(input);
 		#endif 
 
 		ans->pair.value = result;
+		free(input);
+		input = NULL;
 
 	}
 

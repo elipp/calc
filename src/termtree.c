@@ -12,6 +12,13 @@
 
 static int errlevel = 0;
 
+#define ERR_SYNTAX_MASK (0x1 << 6)
+#define ERR_BAD_PARENTHESIS (ERR_SYNTAX_MASK | 0x1)
+#define ERR_BAD_OPERATOR (ERR_SYNTAX_MASK | 0x2)
+#define ERR_TRAILING_PARINPUT (ERR_SYNTAX_MASK | 0x4)
+#define ERR_UNKNOWN_IDENTIFIER (ERR_SYNTAX_MASK | 0x8)
+#define ERR_INTERNAL (0x1)
+
 static struct termtree_t termtree_create(int level);
 static void termtree_add(struct termtree_t *t, const char* term_str, mathfuncptr op, int reparse);
 static void termtree_resize(struct termtree_t *t);
@@ -21,9 +28,10 @@ static int tokenize_term(const char* str, int level, struct termtree_t *tree);
 static void term_get_result(struct term_t *term, int level);
 static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
+static void parse_error(int eno, const char* expr, int pos);
 
-inline fp_t to_double_t(const char* arg, char **endptr) { 
-#ifdef C99_AVAILABLE 
+static inline fp_t to_fp_t(const char* arg, char **endptr) { 
+#ifdef LONG_DOUBLE_PRECISION 
 	fp_t res = strtold(arg, endptr);
 #else
 	fp_t res = strtod(arg, endptr);
@@ -41,7 +49,7 @@ static int check_parenthesis_balance(const char* str) {
 	int i = 0;
 	int parlevel = 0;
 	for (; i < str_len; ++i) {
-		if (parlevel < 0) { fprintf(stderr, "syntax error: parlevel < 0 at expr:%d\n", i); errlevel = 1; return -1; }
+		if (parlevel < 0) { parse_error(ERR_BAD_PARENTHESIS, str, i); return -1; }
 		char c = str[i];
 		if (c == '(') ++parlevel;		
 		else if (c == ')') --parlevel;		
@@ -50,6 +58,30 @@ static int check_parenthesis_balance(const char* str) {
 	return parlevel;
 }
 
+static void parse_error(int eno, const char* expr, int pos) {
+	if (eno & ERR_SYNTAX_MASK) {
+		fprintf(stderr, "syntax error: ");
+		switch(eno) {
+			case ERR_BAD_PARENTHESIS:
+				fputs("bad parenthesis balance and/or placement!\n", stderr);
+				break;
+			case ERR_BAD_OPERATOR:
+				fputs("bad operator placement!\n", stderr);
+				break;
+			case ERR_TRAILING_PARINPUT:
+				fprintf(stderr, "unexpected character input after closing \')\' at expr:%d\n", pos);
+				break;
+			case ERR_UNKNOWN_IDENTIFIER:
+				fprintf(stderr, "unknown identifier \"%s\"\n", expr);
+				break;
+			default:
+				break;
+		}
+	}
+	else fputs("calc: internal parser error (this shouldn't be happening!)\n", stderr);
+
+	errlevel = eno;
+}
 
 static int find_matching_parenthesis(const char* str, int opening_par_pos) {
 
@@ -85,7 +117,7 @@ int parse_mathematical_input(const char* str, fp_t *val) {
 
 	int pb = check_parenthesis_balance(stripped);
 	if (pb != 0) {
-		fprintf(stderr, "syntax error: unmatched parentheses!\n");
+		parse_error(ERR_BAD_PARENTHESIS, "NULL", 0);
 		sa_free(stripped);
 		return 0;
 	}
@@ -175,30 +207,36 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 	int term_beg_pos = 0;
 	int i = 0;
 	size_t term_str_len = strlen(str);
+
+	#define OPERATOR(c) ((c) == of.operators[0] || (c) == of.operators[1])
+
+	char last_char = str[term_str_len-1];
+	if (OPERATOR(last_char)) {
+		parse_error(ERR_BAD_OPERATOR, str, term_str_len-1);
+		return -1;
+	}
+
 	for (; i < term_str_len; ++i) {
 		char c = str[i];
 
-		while (c != of.operators[0]
-		    && c != of.operators[1]
-		    && i < term_str_len) {
+		while (!(OPERATOR(c)) && i < term_str_len) {
 			if (c == '(') {
 				int par_end = find_matching_parenthesis(str, i);
-				if (par_end < 0) { fprintf(stderr, "error: unmatched parenthesis at %d (expr: \"%s\")\n", i, str); return -1; }
+				if (par_end < 0) { parse_error(ERR_BAD_PARENTHESIS, str, i); return -1; }
 				else i = par_end;	// skip to par_end
 			}
 			++i;
 			c = str[i];
 		}
-
+		
 		int term_end_pos = i;
 		int subterm_length = term_end_pos - term_beg_pos;
 
 		if (subterm_length <= 0 && level > 0) {
 			// an expression such as '5++--+-+--+-5' is considered to be syntactically valid,
-			// (hence the level>0 criterion) while '5^*//****///5' isn't.
+			// while '5^*//****///5' isn't (hence the level>0 criterion)
 
-			fprintf(stderr, "syntax error: multiple consecutive \'*\', \'/\', \'^\' and/or \'%%\'\n");
-			errlevel = 1; 
+			parse_error(ERR_BAD_OPERATOR, str, i);
 			return -1;
 		}
 
@@ -213,7 +251,7 @@ int tokenize_term(const char* str, int level, struct termtree_t *tree) {
 		int reparse = 0;
 
 		if (term_has_strippable_parentheses(subterm)) {
-			if (strlen(subterm) <= 2) { fprintf(stderr, "syntax error: \"()\"\n"); errlevel = 1; return -1; }
+			if (strlen(subterm) <= 2) { parse_error(ERR_BAD_PARENTHESIS, subterm, i); return -1; }
 			char *subterm_stripped = strip_surrounding_parentheses(subterm);
 			sa_free(subterm);
 			subterm = subterm_stripped;
@@ -243,13 +281,11 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 			int tlen = closing_par_pos - opening_par_pos;
 
 			if (tlen <= 0) { 
-				fprintf(stderr, "parse error: failure extracting function argstr!\n");
-				errlevel = 1;
-				return 0;
-			} else if (closing_par_pos != (strlen(term->string) - 1)) {
-				fprintf(stderr, "syntax error: unexpected char input after argstr closing parenthesis!\n");
-				errlevel = 1;
-				return 0;
+				parse_error(ERR_INTERNAL, NULL, 0);
+				return -1;
+			} else if (closing_par_pos < (strlen(term->string) - 1)) {
+				parse_error(ERR_TRAILING_PARINPUT, term->string, closing_par_pos + 1);
+				return -1;
 			}
 
 			char *argstr = substring(term->string, opening_par_pos, tlen+1);
@@ -282,12 +318,12 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 static void term_convert_strtod(struct term_t *term) {
 	char *endptr = NULL;
 	// do a function strcmp pass here
-	if (!term_varfuncid_strcmp_pass(term)) {
+	int r = -1;
+	if ((r = term_varfuncid_strcmp_pass(term)) <= 0) {
 		// no matches->strtod.
-		fp_t val = to_double_t(term->string, &endptr);
+		fp_t val = to_fp_t(term->string, &endptr);
 		if (endptr < term->string + strlen(term->string)) {
-			fprintf(stderr, "syntax error: \"%s\": unknown identifier!\n", term->string);
-			errlevel = 1;
+			parse_error(ERR_UNKNOWN_IDENTIFIER, term->string, 0);
 			term->value = 0;
 		}
 

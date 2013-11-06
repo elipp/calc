@@ -1,76 +1,7 @@
 #include "rl_emul.h"
 #include "string_allocator.h"
 
-#define TMPBUF_SZ 1024
-
-#define DECREMENT_CUR_POS_NZ()\
-	do {\
-		if (cur_pos > 0) { --cur_pos; }\
-	} while(0)
-
-#define DECREMENT_LINE_LEN_NZ() \
-	do {\
-		if (line_len > 0) { --line_len; }\
-	} while(0)
-
-#define INCREMENT_MARKERS()\
-	do {\
-		++cur_pos;\
-		++line_len;\
-	} while(0)
-
-/* the following macros are debugging utility macros. */
-
-#define BUFFER_PRINT_RAW_CHARS(n)\
-	do {\
-		printf("\nraw buffer contents up to %d: ", (n));\
-		int i = 0;\
-		while (i < (n)) {\
-			if (buffer[i] == '\0') { putchar('@'); }\
-			else putchar(buffer[i]);\
-			++i;\
-		}\
-	} while(0)
-
-#define PRINT_RAW_CHARS(buf, n)\
-	do {\
-		printf("\nraw buffer contents up to %lu: ", (n));\
-		int i = 0;\
-		while (i < (n)) {\
-			if ((buf)[i] == '\0'){ putchar('@'); }\
-			else putchar((buf)[i]);\
-			++i;\
-		}\
-	} while(0)
-
-#define HIST_CURRENT_INCREMENT()\
-	do {\
-		hist_current = hist_current->next ? hist_current->next : &buffer_current;\
-	} while(0)
-
-#define HIST_CURRENT_DECREMENT()\
-	do {\
-			hist_current = hist_current->prev ? hist_current->prev : hist_root;\
-	} while(0)
-
-
-#define CTRL_A		0x1
-#define CTRL_E		0x5
-#define CTRL_K		0xB
-#define CTRL_E		0x5
-#define LINE_FEED 	'\n'
-#define TAB_STOP	'\t'
-#define BACKSPACE	0x7F
-
-// ANSI X3.64 arrow keypress control sequence (0x1B5Bxx) last byte identifiers
-// (there are longer ones as well, e.g. the F9-F12 keys generate a total of 5 bytes)
-
-#define ARROW_UP 	0x41
-#define ARROW_DOWN 	0x42	
-#define ARROW_LEFT 	0x44
-#define ARROW_RIGHT 	0x43	
-
-#define DELETE		0x33
+static size_t rl_main_buffer_size = 1024;
 
 /* ANSI escape sequences */
 
@@ -86,10 +17,12 @@ static const char* esc_composite_ml_bk_pre = "\033[1D \033[1D\0337\033[0K";
 
 /* (static) function declarations */
 
-static void gb_create_gap(char* buffer);
-static void gb_merge(char* buffer);
+static void gb_create_gap(size_t);
+static void gb_merge();
 
 static const char* hist_get_current(size_t*);
+
+static int initialized = 0;
 
 typedef struct _hist_node {
 	struct _hist_node *next;
@@ -106,8 +39,8 @@ static hist_node *hist_root = &buffer_current;
 
 static size_t hist_size = 0;
 
-/* main line-editing buffer */
-static char buffer[TMPBUF_SZ];
+/* main line-editing main_buffer */
+static char *main_buffer = NULL;
 static char ctrl_char_buf[8] = { 0 };
 
 static void rl_emul_hist_destroy();
@@ -118,7 +51,7 @@ void rl_emul_hist_add(const char *arg) {
 
 	const size_t arg_len = strlen(arg);
 	hist_node *newnode = malloc(sizeof(hist_node));
-	newnode->line_contents = strndup(arg, arg_len);
+	newnode->line_contents = strdup(arg);
 	newnode->line_length = arg_len;
 
 	if (hist_head == &buffer_current) {
@@ -179,17 +112,17 @@ static void rid_excess_chars_stdin(char ctrl) {
 
 static enum { GB_NOEXIST = 0, GB_MIDLINE_INSERT, GB_MIDLINE_BACKSPACE } gb_exists;
 
-static char *gb_pre = NULL;	// if gb_exists, points to cur_pos + 1
-static char *gb_post = NULL;	// points to the first character after the gap.
+static char *gb_post_buffer = NULL;
+static size_t gb_post_length = 0;
+static size_t gb_post_bufsize = 256;
 
 static const size_t gap_width = 0xF;
 	
 static size_t cur_pos = 0; 
-static size_t line_len = 0; // this represents the net length of the line (i.e., not including the potential gap in the buffer)
-
-static size_t post_len = 0;	// represents the length of the post-gap portion of the line.
+static size_t line_len = 0; // this represents the net length of the line (i.e., not including the potential gap in the main_buffer)
 
 static struct termios old;
+
 
 void rl_emul_init() {
 
@@ -199,50 +132,50 @@ void rl_emul_init() {
 	new = old;
 	new.c_lflag &=(~ICANON & ~ECHO);
 	tcsetattr(0, TCSANOW, &new);
+
+	main_buffer = malloc(rl_main_buffer_size);
+	gb_post_buffer = malloc(gb_post_bufsize);
+
+	initialized = 1;
+
 }
 
 void rl_emul_deinit() {
 	// restore old termios attrs
+	if (main_buffer) { free(main_buffer); main_buffer = NULL; }
+	if (gb_post_buffer) { free(gb_post_buffer); gb_post_buffer = NULL; }
 	tcsetattr(0, TCSANOW, &old);
 	rl_emul_hist_destroy();
 }
 
-static void gb_create_gap(char *buffer) {
-	// check for buffer overflow, lolz
-	
-	// create gap at cur_pos -> cur_pos + gap_width
+int rl_emul_initialized() { return initialized; }
 
-	if (!gb_exists) {
-		post_len = line_len - cur_pos;
-		gb_pre = buffer + cur_pos + 1;	// by definition, points to cur_pos + 1
+static void gb_create_gap(size_t post_len) {
+	
+	if (gb_exists) gb_merge();
+
+	if (post_len >= gb_post_bufsize-1) { 
+		free(gb_post_buffer);
+		gb_post_bufsize = ((post_len/256)+1)*256;
+		gb_post_buffer = malloc(gb_post_bufsize);
 	}
 
-	// relocate post-part of buffer
-	
-	char posttmp[post_len+1];	// we could store posttmp in a static, global variable though
+	gb_post_length = line_len - cur_pos;		
+	memcpy(gb_post_buffer, main_buffer + cur_pos, gb_post_length);
 
-	memcpy(posttmp, gb_exists ? gb_post : buffer + cur_pos, post_len);
-	posttmp[post_len] = '\0';
-
-	gb_post = gb_pre + gap_width;
-
-	memcpy(gb_post, posttmp, post_len);
-
-	*(gb_pre) = '\0';
+	main_buffer[cur_pos] = '\0';
+	gb_post_buffer[post_len] = '\0';
 	gb_exists = GB_MIDLINE_INSERT;
 
 }
 
-static void gb_merge(char *buffer) {
-	// assuming gb_pre & gb_post have meaningful values
-	// copy post-part of buffer to position gb_pre
-	
-	char *posttmp = strndup(gb_post, post_len);	// will leak memory if not freed
-	memcpy(gb_pre-1, posttmp, post_len);
-	*(gb_pre+post_len-1) = '\0';
+static void gb_merge() {
+	memcpy(main_buffer+cur_pos, gb_post_buffer, gb_post_length);
+	main_buffer[line_len] = '\0';
+	gb_post_length = 0;
+
 	// gap no longer exists, reset flag
 	gb_exists = GB_NOEXIST;
-	free(posttmp);
 }
 
 
@@ -258,33 +191,29 @@ static void handle_ANSI_escape_seq() {
 
 		rid_excess_chars_stdin(ctrl_char_buf[1]);
 
+		if (gb_exists) gb_merge();
+
 		switch (ctrl_char_buf[1]) {
 			case ARROW_LEFT:
-				if (gb_exists) {
-					gb_merge(buffer);
-				}
 				printf("%s", esc_cur_1_left);
 				DECREMENT_CUR_POS_NZ();
 				break;
 			case ARROW_RIGHT:
-
-				if (gb_exists) {
-					gb_merge(buffer);
-				}
 				if (cur_pos < line_len) {
 					printf("%s", esc_cur_1_right);
 					++cur_pos; 
 				}
 				break;
+
 			case ARROW_UP:
-				// clear whole line and buffer
+				// clear whole line and main_buffer
 				printf("%s", esc_composite_clear_line_reset_left);
-				// to enable real readline-like behavior, the current buffer
+				// to enable real readline-like behavior, the current main_buffer
 				// is stored at the first position.
 				if (hist_current == &buffer_current) {
-					if (gb_exists) { gb_merge(buffer); }
+					if (gb_exists) gb_merge(); 
 					if (buffer_current.line_contents) { free(buffer_current.line_contents); }
-					buffer_current.line_contents = strndup(buffer, line_len);
+					buffer_current.line_contents = strndup(main_buffer, line_len);
 					buffer_current.line_length = line_len;
 				}
 
@@ -294,47 +223,46 @@ static void handle_ANSI_escape_seq() {
 				if (hist_line) {
 					line_len = hist_line_len;
 					cur_pos = line_len;
-					memcpy(buffer, (const void*)hist_line, hist_line_len);
-					buffer[hist_line_len] = '\0';	// just to be sure :P
+					memcpy(main_buffer, (const void*)hist_line, hist_line_len);
+					main_buffer[hist_line_len] = '\0';	// just to be sure :P
 				} 
 
-				printf("%s", buffer);
+				printf("%s", main_buffer);
 
 				break;
 
 			case ARROW_DOWN:
 				HIST_CURRENT_INCREMENT();
-				printf("%s", esc_composite_clear_line_reset_left);
 
 				if (hist_current == &buffer_current) {	
 					hist_line = buffer_current.line_contents;
 					line_len = buffer_current.line_length;
 					cur_pos = line_len;
-					memcpy(buffer, (const void*)buffer_current.line_contents, buffer_current.line_length);
-					buffer[buffer_current.line_length] = '\0';	
+					memcpy(main_buffer, (const void*)buffer_current.line_contents, buffer_current.line_length);
+					main_buffer[buffer_current.line_length] = '\0';	
 				}
 				else {
 					hist_line = hist_get_current(&hist_line_len);
 					line_len = hist_line_len;
 					cur_pos = line_len;
-					memcpy(buffer, (const void*)hist_line, hist_line_len);
-					buffer[hist_line_len] = '\0';	
+					memcpy(main_buffer, (const void*)hist_line, hist_line_len);
+					main_buffer[hist_line_len] = '\0';	
 				}
 
-				printf("%s", buffer);
+				printf("%s", esc_composite_clear_line_reset_left);
+				printf("%s", main_buffer);
 
 				break;
 			case DELETE:
-				// the delete doesn't use gap buffering (would require an infrastructural overhaul)
+
 				if (cur_pos < line_len) {	// there can only be mid-line deletes :P
 					const size_t rem_len = line_len - cur_pos;
-					gb_pre = buffer+cur_pos;
-					gb_post = buffer+cur_pos+1;
-					buffer[cur_pos] = '\0';
-					printf("%s%s%s%s", esc_cur_save, esc_clear_cur_right, gb_post, esc_cur_restore);
-					memcpy(gb_pre, gb_post, rem_len);
+					printf("%s%s%s%s", esc_cur_save, esc_clear_cur_right, main_buffer+cur_pos+1, esc_cur_restore);
+					memmove(main_buffer + cur_pos, main_buffer + cur_pos + 1, rem_len);
 					DECREMENT_LINE_LEN_NZ();
+					main_buffer[line_len] = '\0';
 				}
+
 				break;
 			default:
 				break;
@@ -344,53 +272,49 @@ static void handle_ANSI_escape_seq() {
 
 static void handle_regular_char_input(char c) {
 
-	if (cur_pos != line_len && !gb_exists) {
-		gb_create_gap(buffer);
-		buffer[cur_pos] = c;
-		++gb_pre;
+	if (cur_pos >= rl_main_buffer_size-1) {
+		rl_main_buffer_size *= 2;
+		main_buffer = realloc(main_buffer, rl_main_buffer_size);
+	
+		if (!main_buffer) { fprintf(stderr, "rl_emul: buffer overflow->realloc error!\n"); exit(0); }
+	}
+
+	if (cur_pos < line_len && !gb_exists) {
+		gb_create_gap(line_len - cur_pos);
+		main_buffer[cur_pos] = c;
 		INCREMENT_MARKERS();
 		putchar(c);
-		printf("%s", esc_cur_save);
-		printf("%s%s", gb_post, esc_cur_restore); 
+		printf("%s%s%s", esc_cur_save, gb_post_buffer, esc_cur_restore); 
 	}
 	else { 
-		if (gb_exists) {
-			if (gb_pre >= gb_post-1) {
-				gb_create_gap(buffer);
-			}
-			++gb_pre;
-		}
-
+		// the whole point of the gap buffer arrangement is to avoid doing memmove()s on every single midline insert
 		putchar(c); 
-
+		
 		if (gb_exists) {
-			// it's probably too risky to put a curpos_save and a restore on the same printf call
-			printf("%s", esc_cur_save);
-			printf("%s%s", gb_post, esc_cur_restore);
+			printf("%s%s%s", esc_cur_save, gb_post_buffer, esc_cur_restore);
 		}
 
-		buffer[cur_pos] = c;
+		main_buffer[cur_pos] = c;
+		main_buffer[cur_pos+1] = '\0';
 		INCREMENT_MARKERS();
-		buffer[cur_pos] = '\0';
 	}
 }
 
 
 char *rl_emul_readline(const char* prompt) {
 
-	memset(buffer, 0, sizeof(buffer));	// probably a bit superfluous
-	gb_pre = buffer;
-	gb_post = buffer;
+	memset(main_buffer, '\0', rl_main_buffer_size);	// probably a bit superfluous
 
 	cur_pos = 0;
 	line_len = 0;
+	gb_post_length = 0;
 
 	while (1) {
 		char c;
 		c = getchar();
 		if (c == LINE_FEED) {	// enter, or line feed
 			// if there's a gap in the buffer, merge
-			if (gb_exists) { gb_merge(buffer); }
+			if (gb_exists) { gb_merge(); }
 			putchar(c);
 			break;
 		}
@@ -399,50 +323,45 @@ char *rl_emul_readline(const char* prompt) {
 			// the real readline library has some autocompletion features
 		}
 		else if (c == CTRL_A) {
-			if (gb_exists) { gb_merge(buffer); }
+			if (gb_exists) { gb_merge(); }
 			printf("%s", esc_cur_reset_left);
 			cur_pos = 0;
 		}
 		else if (c == CTRL_E) {
-			if (gb_exists) { gb_merge(buffer); }
+			if (gb_exists) { gb_merge(); }
 			printf("%s", esc_cur_reset_left);
 			printf("\033[%luC", line_len);
 			cur_pos = line_len;
 		}
 		else if (c == CTRL_K) {
-			if (gb_exists) { gb_merge(buffer); }
+			if (gb_exists) { gb_merge(); }
 			printf("%s", esc_clear_cur_right);
-			buffer[cur_pos] = '\0';
+			main_buffer[cur_pos] = '\0';
 		}
 		else if (c == CTRL_E) {
-			if (gb_exists) { gb_merge(buffer); }
+			if (gb_exists) { gb_merge(); }
 			printf("%s\033[%luC", esc_cur_reset_left, line_len);
 			cur_pos = line_len;
 		}
 		else if (c == BACKSPACE) {	// backspace
 			
 			if (gb_exists == GB_MIDLINE_INSERT) {	
-				gb_merge(buffer);	// this sets gb_exists = NOEXIST
+				gb_merge();	// this sets gb_exists = NOEXIST
 			}
+			
+			int d = line_len - cur_pos;
+			memmove(main_buffer+cur_pos-1, main_buffer+cur_pos, d);
 
-			if (cur_pos != line_len && !gb_exists) {
-				gb_pre = buffer+cur_pos+1;	// this will get decremented at the end of this block
-				gb_post = buffer+cur_pos;	// seems absurd, see above comment
-				gb_exists = GB_MIDLINE_BACKSPACE;
-				post_len = line_len - cur_pos;
-			}
-			// the printing code needs special attention if cur_pos != line_len
+			DECREMENT_CUR_POS_NZ();
+			DECREMENT_LINE_LEN_NZ();
+			main_buffer[line_len] = '\0';
 
-			if (cur_pos != line_len) {	// this pretty much guarantees gb_post has a meaningful value
-				printf("%s%s%s", esc_composite_ml_bk_pre, gb_post, esc_cur_restore);
+			if (cur_pos < line_len) {	
+				printf("%s%s%s", esc_composite_ml_bk_pre, main_buffer+cur_pos, esc_cur_restore);
 			} else {
 				printf("%s", esc_composite_bkspc);
 			}
 
-			DECREMENT_CUR_POS_NZ();
-			DECREMENT_LINE_LEN_NZ();
-			buffer[cur_pos] = '\0';
-			--gb_pre;
 		}
 
 		else if (c == '\033') {
@@ -452,10 +371,10 @@ char *rl_emul_readline(const char* prompt) {
 			handle_regular_char_input(c);
 		}
 
-}
+	}
 	
 	if (line_len == 0) { return NULL; }
-	else return strndup(buffer, line_len);
+	else return strndup(main_buffer, line_len);
 
 }
 
