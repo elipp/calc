@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
 	char *pipe_buf;
 	if (read_stdin_piped_input(&pipe_buf) > 0) {
 		fp_t result;
-		fprintf(stderr, "%s\n", pipe_buf);
+		//fprintf(stderr, "%s\n", pipe_buf);
 		if (!parse_mathematical_input(pipe_buf, &result)) {
 			fprintf(stderr, "error: parse_mathematical_input failed!\n");
 			free(pipe_buf);
