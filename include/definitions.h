@@ -5,7 +5,7 @@
 #include "wlist.h"
 
 #ifdef LONG_DOUBLE_PRECISION
-#define DEFAULT_PREC 16
+#define DEFAULT_PREC 12
 typedef long double fp_t;
 #else
 #define DEFAULT_PREC 10

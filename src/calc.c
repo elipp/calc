@@ -72,29 +72,27 @@ static int read_stdin_piped_input(char** buffer) {
 
 }
 
+#define REQ_THRESHOLD 0.0000000001
+#define BIG_THRESHOLD 1000000000.0
+
 static int roughly_equal(fp_t a, fp_t b) {
 	fp_t delta = a-b;
-	return (fabs(delta) < 0.00000000000000001) ? 1 : 0;
+	return (fabs(delta) < REQ_THRESHOLD) ? 1 : 0;
 }
 
 static void report_result(fp_t r) {
-	if (roughly_equal(r, FLOOR(r))) {
-		if (r < 1000000000.0) {
-			printf(resultfmti, r);
-		}
-		else {
-			printf("\033[1;29m= %1.16Lg\033[m\n", r);
-		}
+	if (roughly_equal(r, FLOOR(r)) && r < BIG_THRESHOLD) {
+		printf(resultfmti, r);
 	} else { 
 		printf(resultfmtd, r); 
 	}
 }
 
 static void report_result_plain(fp_t r) {
-	if (roughly_equal(r, FLOOR(r))) {
-		printf("%.1Lf\n", r);
+	if (roughly_equal(r, FLOOR(r)) && r < BIG_THRESHOLD) {
+		printf("%.0Lf\n", r);
 	} else { 
-		printf("%.16Lf\n", r); 
+		printf("%.12Lg\n", r); 
 	}
 
 }
