@@ -366,7 +366,7 @@ static void term_get_result(struct term_t *term, int level) {
 		
 	}
 
-	double result = 0.0;
+	fp_t result = 0.0;
 	result = tree.terms[0].value;
 
 	for (i = 1; i < tree.num_terms; ++i) {
