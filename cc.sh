@@ -12,8 +12,8 @@ CC="clang -g -Wall -lm -lmpfr -lgmp"
 
 INCLUDE="-I./include/"
 
-DEFINE="-DLONG_DOUBLE_PRECISION"
-#DEFINE="-DUSE_MPFR"
+#DEFINE="-DLONG_DOUBLE_PRECISION"
+DEFINE="-DUSE_MPFR"
 
 function clean() {
 	rm calc result_test memusage
