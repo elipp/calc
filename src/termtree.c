@@ -19,6 +19,21 @@ static int errlevel = 0;
 #define ERR_UNKNOWN_IDENTIFIER (ERR_SYNTAX_MASK | 0x8)
 #define ERR_INTERNAL (0x1)
 
+static struct term_t term_construct() {
+	struct term_t t;
+
+	fp_t_construct(&t.value);
+	t.string = NULL;
+	t.reparse = 0;
+
+	return t;
+}
+
+
+static void term_destroy(struct term_t *t) {
+	fp_t_destroy(&t->value);
+}
+
 static struct termtree_t termtree_create(int level);
 static void termtree_add(struct termtree_t *t, const char* term_str, mathfuncptr op, int reparse);
 static void termtree_resize(struct termtree_t *t);
@@ -30,14 +45,6 @@ static void term_convert_strtod(struct term_t *term);
 static struct term_t term_create(const char* str, int reparse);
 static void parse_error(int eno, const char* expr, int pos);
 
-static inline fp_t to_fp_t(const char* arg, char **endptr) { 
-#ifdef LONG_DOUBLE_PRECISION 
-	fp_t res = strtold(arg, endptr);
-#else
-	fp_t res = strtod(arg, endptr);
-#endif
-	return res;
-}
 
 // misc helpers 
 static int check_parenthesis_balance(const char* str);
@@ -125,7 +132,7 @@ int parse_mathematical_input(const char* str, fp_t *val) {
 	struct term_t t = term_create(stripped, 1);
 
 	term_get_result(&t, 0);
-	*val = t.value;
+	fp_t_assign(val, t.value);
 
 	sa_free(stripped);
 
@@ -150,9 +157,8 @@ struct termtree_t termtree_create(int level) {
 }
 
 struct term_t term_create(const char* str, int reparse) {
-	struct term_t term;
+	struct term_t term = term_construct();
 	term.string = sa_strdup(str);
-	term.value = .0f;
 	term.reparse = reparse;
 	return term;
 }
@@ -160,7 +166,7 @@ struct term_t term_create(const char* str, int reparse) {
 void termtree_destroy(struct termtree_t *t) {
 	int i = 0;
 	for (; i < t->num_terms; ++i) 
-		sa_free(t->terms[i].string);
+		term_destroy(&t->terms[i]);
 
 	free(t->terms);
 	free(t->ops);
@@ -292,7 +298,7 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 			struct term_t arg_term = term_create(argstr, 1);
 			term_get_result(&arg_term, 0);
 			
-			term->value = functions[i].funcptr(arg_term.value);
+			functions[i].funcptr(&term->value, arg_term.value);
 			sa_free(argstr);
 
 			return 1;
@@ -301,14 +307,14 @@ static int term_varfuncid_strcmp_pass(struct term_t *term) {
 
 	for (i = 0; i < constants_table_size; ++i) {
 		if (strcmp(term->string, constants[i].key) == 0) {
-			term->value = constants[i].value;
+			fp_t_assign(&term->value, constants[i].value);
 			return 1;
 		}
 	}
 
 	struct udc_node *n = udctree_search(term->string);
 	if (n) {
-		term->value = n->pair.value;
+		fp_t_assign(&term->value, n->pair.value);
 		return 1;
 	}
 
@@ -321,15 +327,8 @@ static void term_convert_strtod(struct term_t *term) {
 	int r = -1;
 	if ((r = term_varfuncid_strcmp_pass(term)) <= 0) {
 		// no matches->strtod.
-		fp_t val = to_fp_t(term->string, &endptr);
-		if (endptr < term->string + strlen(term->string)) {
+		if (!to_fp_t(&term->value, term->string, &endptr))
 			parse_error(ERR_UNKNOWN_IDENTIFIER, term->string, 0);
-			term->value = 0;
-		}
-
-		else {
-			term->value = val;
-		}
 	}
 }
 
@@ -344,7 +343,6 @@ static void term_get_result(struct term_t *term, int level) {
 	int ret;
 	if ((ret = tokenize_term(term->string, level, &tree)) < 0) {
 //		fprintf(stderr, "WARNING: term tokenization failed!\n");
-		term->value = 0;
 		termtree_destroy(&tree);
 		errlevel = 1;
 		return;
@@ -352,7 +350,6 @@ static void term_get_result(struct term_t *term, int level) {
 	
 	else if (ret == 0) {
 		// a return value of 0 signifies a NULL term string.
-		term->value = 0;
 		return;
 	}
 
@@ -366,14 +363,18 @@ static void term_get_result(struct term_t *term, int level) {
 		
 	}
 
-	double result = 0.0;
-	result = tree.terms[0].value;
+	fp_t result;
+	fp_t_construct(&result);
+
+	fp_t_assign(&result, tree.terms[0].value);
 
 	for (i = 1; i < tree.num_terms; ++i) {
-		result = tree.ops[i-1](result, tree.terms[i].value);
+		tree.ops[i-1](&result, result, tree.terms[i].value);
 	}
 
-	term->value = result;
+	fp_t_assign(&term->value, result);
+
+	fp_t_destroy(&result);
 	termtree_destroy(&tree);
 }
 

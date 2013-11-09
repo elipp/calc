@@ -4,13 +4,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 
-#ifdef NO_GNU_READLINE
 #include "rl_emul.h"
-#else
-#include <readline/readline.h>
-#include <readline/history.h>
-#endif
-
 #include "definitions.h"
 #include "termtree.h"
 #include "string_manip.h"
@@ -20,24 +14,19 @@
 #include "wlist.h"
 #include "commands.h"
 
-extern char resultfmtd[];
-extern const char *resultfmti;
+#ifdef USE_MPFR
+static const char* prec_config = "the GNU MPFR library";
 
-#ifdef LONG_DOUBLE_PRECISION
+#elif LONG_DOUBLE_PRECISION
 static const char* prec_config = "long double as fp_t";
+
 #else
 static const char* prec_config = "double as fp_t";
-#endif
 
-#ifdef NO_GNU_READLINE
+#endif
 static const char* rl_config = "bundled rl_emul";
-#else 
-static const char* rl_config = "GNU readline";
-#endif
 
-static const char* version_string = "0.1a";
-
-static const size_t fp_t_size_bits = sizeof(fp_t) * 8;
+static const char* version_string = "0.1.1a";
 
 extern int quit_signal;
 
@@ -72,37 +61,24 @@ static int read_stdin_piped_input(char** buffer) {
 
 }
 
-#define REQ_THRESHOLD 0.0000000001
 #define BIG_THRESHOLD 1000000000.0
 
-static int roughly_equal(fp_t a, fp_t b) {
-	fp_t delta = a-b;
-	return (fabs(delta) < REQ_THRESHOLD) ? 1 : 0;
-}
-
 static void report_result(fp_t r) {
-	if (roughly_equal(r, FLOOR(r)) && r < BIG_THRESHOLD) {
-		printf(resultfmti, r);
-	} else { 
-		printf(resultfmtd, r); 
-	}
+	fputs("\033[1;29m= ", stdout);
+	fp_t_print(r, precision);
+	fputs("\033[m\n", stdout);
 }
 
 static void report_result_plain(fp_t r) {
-	if (roughly_equal(r, FLOOR(r)) && r < BIG_THRESHOLD) {
-		printf("%.0Lf\n", r);
-	} else { 
-		printf("%.12Lg\n", r); 
-	}
-
+	fp_t_print(r, precision);
+	fputc('\n', stdout);
 }
 
 static char *concatenate_argv(int argc, char *argv[]) {
 	size_t tlen = 0;
 	int i = 1;
-	for (; i < argc; ++i) {
+	for (; i < argc; ++i) 
 		tlen += strlen(argv[i]);
-	}
 
 	size_t bufsize = tlen+argc+1;
 	char *buffer = malloc(bufsize);
@@ -118,16 +94,15 @@ static char *concatenate_argv(int argc, char *argv[]) {
 }
 
 static void cleanup() {
-	#ifdef NO_GNU_READLINE
 	if (rl_emul_initialized()) 
 		rl_emul_deinit();
-	#endif
+	udctree_destroy();
+	clean_constants();
 }
 
 
 static void sig_handler(int signum) {
 	cleanup();
-	puts("\n");
 	exit(signum);
 }
 
@@ -136,10 +111,13 @@ int main(int argc, char* argv[]) {
 	signal(SIGINT, sig_handler);
 	set_precision(DEFAULT_PREC);
 	
+	setup_constants();
+	
+	fp_t result;
+	fp_t_construct(&result);
+
 	char *pipe_buf;
 	if (read_stdin_piped_input(&pipe_buf) > 0) {
-		fp_t result;
-		//fprintf(stderr, "%s\n", pipe_buf);
 		if (!parse_mathematical_input(pipe_buf, &result)) {
 			fprintf(stderr, "error: parse_mathematical_input failed!\n");
 			free(pipe_buf);
@@ -155,7 +133,6 @@ int main(int argc, char* argv[]) {
 	else if (argc > 1) {
 		// we presumably are being presented with a mathexpr as command-line argument
 		char *argv_collected = concatenate_argv(argc, argv);		
-		fp_t result;
 		if (!parse_mathematical_input(argv_collected, &result)) {
 			fprintf(stderr, "error: parse_mathematical_input failed!\n");
 			free(argv_collected);
@@ -168,28 +145,25 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	
-	printf("calc %s - using %s (%lu bit width) & %s.\n", 
-	version_string, prec_config, fp_t_size_bits, rl_config);
+	printf("calc %s - using %s & %s.\n", 
+	version_string, prec_config, rl_config);
 	
-#ifdef NO_GNU_READLINE
 	rl_emul_init();
-#endif
 	char *input;
 
-	struct udc_node *ans = udctree_add("ans", 0);
+	struct udc_node *ans = udctree_add("ans", result);
 
 	while (quit_signal == 0) {
 
 		sa_clearbuf();
-		#ifdef NO_GNU_READLINE
 		input = rl_emul_readline("");
-		#else
-		input = readline("");
-		#endif
+		
 		if (!input) continue;	// to counter ^A^D (ctrl+A ctrl+D) segfault
 		
 		char *input_tidy = strip_duplicate_whitespace(strip_surrounding_whitespace(input));
 		if (!input_tidy) { continue; }
+			
+		rl_emul_hist_add(input);
 		
 		struct wlist_t wlist = wlist_generate(input_tidy, " ");
 		int found = wlist_parse_command(&wlist);
@@ -201,28 +175,21 @@ int main(int argc, char* argv[]) {
 		// -> all whitespace can now be filtered, to simplify parsing
 		// This validates invalid expressions such as " 5 + 5 3 51 5 3" though...
 
-		fp_t result = 0;
 		if (!parse_mathematical_input(input_tidy, &result)) {
 			continue;	
 		}
 
 		report_result(result);
-		
-		#ifdef NO_GNU_READLINE
-		rl_emul_hist_add(input);
-		#else 
-		add_history(input);
-		#endif 
+		fp_t_assign(&ans->pair.value, result);
 
-		ans->pair.value = result;
 		free(input);
 		input = NULL;
 
 	}
 
-	#ifdef NO_GNU_READLINE
+	fp_t_destroy(&result);
+
 	rl_emul_deinit();
-	#endif
 
 	return 0;
 

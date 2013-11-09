@@ -1,5 +1,6 @@
 #include "ud_constants_tree.h"
 #include "definitions.h"
+#include "functions.h"
 
 // not implementing udc_tree as a struct, since there will only ever be 1 of them
 // Instead, it is implemented as a collection of global variables :-D
@@ -17,7 +18,8 @@ static void udctree_init() {
 static struct udc_node *udc_node_create(const char* term, fp_t value) {
 	struct udc_node *node = malloc(sizeof(struct udc_node));
 	node->pair.key = strdup(term);
-	node->pair.value = value;
+	fp_t_construct(&node->pair.value);
+	fp_t_assign(&node->pair.value, value);
 	node->next = NULL;
 	return node;
 }
@@ -43,7 +45,7 @@ struct udc_node *udctree_add(const char* key, fp_t value) {
 }
 
 
-void udctree_delete() {
+void udctree_destroy() {
 
 	if (udctree_num_nodes > 0) {
 		struct udc_node *iter = udctree_get_root();

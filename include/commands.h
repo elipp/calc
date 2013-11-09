@@ -10,7 +10,7 @@
 
 typedef struct {
 	const char* key;
-	fp_t (*funcptr)(const char*);
+	void (*funcptr)(fp_t*, const char*);
 } key_strfuncptr_pair;
 
 typedef struct {
@@ -25,7 +25,7 @@ void help_my();
 void help_set();
 
 void set(struct wlist_t* wlist);
-void set_precision();
+void set_precision(long p);
 
 void my(struct wlist_t* wlist);
 void my_list();
@@ -34,5 +34,6 @@ void quit();
 
 extern const key_funcptr_pair commands[];
 extern const size_t commands_table_size;
+extern int precision;
 
 #endif

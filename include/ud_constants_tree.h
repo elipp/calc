@@ -12,7 +12,7 @@ struct udc_node {
 };
 
 struct udc_node *udctree_add(const char* key, fp_t value);
-void udctree_delete();
+void udctree_destroy();
 size_t udctree_get_num_nodes();
 struct udc_node *udctree_search(const char* term);
 struct udc_node *udctree_get_root();

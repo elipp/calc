@@ -20,7 +20,7 @@ struct termtree_t {
 	int id;	// debug
 };
 
-fp_t to_double_t(const char* arg, char **endptr);
+void to_double_t(fp_t *t, const char* arg, char **endptr);
 int parse_mathematical_input(const char* str, fp_t *val);
 
 #endif
