@@ -14,7 +14,9 @@ const char *resultfmti = "= \033[1;29m%1.0f\033[m\n";
 #endif
 
 char resultfmtd[PRECSTRING_MAX] = { 0 };	
-int precision = DEFAULT_PREC;
+
+int precision_bits = PRECISION_BITS_INITIAL;
+int print_significant_figures = 16;
 
 extern const key_mathfuncptr_pair functions[];
 extern const size_t functions_table_size;
@@ -210,7 +212,7 @@ my x = sin((3/4)pi)\n\
 void help_set() {
 	printf("\n\
 The \"set\" command can be used to control calc's inner workings. Available subcommands are:\n\
-	set precision <integer argument>, controls how many decimals are shown in the final result\n\
+	set precision <integer argument>, controls how many significant figures are displayed in the final result\n\
 \n");
 }
 
@@ -242,21 +244,23 @@ void set(struct wlist_t *wlist) {
 
 }
 
-void set_precision(long prec) {
+void set_precision(long significant_figures) {
 
-	if (prec < 1) { printf("set precision: error: precision requested < 1\n"); return; }
+	if (significant_figures < 1) { printf("set precision: error: precision requested < 1\n"); return; }
 
 	#ifdef USE_MPFR
-	mpfr_set_default_prec(prec);
+	int bits = ((minimum_bits_for_significant_figures(significant_figures)/128)+1)*128; 
+	mpfr_set_default_prec(bits);
+	precision_bits = bits;
 
-	#elif LONG_DOUBLE_PRECISION
-	if (prec > DEFAULT_PREC) { 
-		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", DEFAULT_PREC); 
-		if (prec > 56) { prec = 50; printf("Clamped precision to 50 decimal places.\n"); }
+	#else
+	int max_significant_figures = significant_figures_max(PRECISION_BITS_INITIAL);
+	if (significant_figures > max_significant_figures) { 
+		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", max_significant_figures); 
 	}
 	#endif
 
-	precision = prec;
+	print_significant_figures = significant_figures;
 }
 
 void quit() {

@@ -2,7 +2,7 @@
 #define TERMTREE_H
 
 #include "functions.h"
-#include "definitions.h"
+#include "fp_t.h"
 
 struct term_t {
 	char *string;

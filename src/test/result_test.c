@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "definitions.h"
+#include "fp_t.h"
 #include "termtree.h"
 #include "string_allocator.h"
 #include "tables.h"
@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
 	static const size_t tests_size = sizeof(tests)/sizeof(tests[0]);
 	int i = 0;
 	int passed = 0;
-	set_precision(DEFAULT_PREC);
+	set_precision(PRECISION_BITS_INITIAL);
 	setup_constants();
 
 	puts("calc: Running a (very) small test suite, testing the parser for correctness, not accuracy.\n\n");

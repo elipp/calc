@@ -3,7 +3,7 @@
 
 #include <math.h>
 #include <stdio.h>
-#include "definitions.h"
+#include "fp_t.h"
 
 #ifdef USE_CHEM_PLUGINS
 #include "chem/chem.h"
@@ -36,15 +36,6 @@ void func_factorial(fp_t *r, fp_t f);
 
 void func_deg(fp_t *r, fp_t rad);
 void func_rad(fp_t *r, fp_t deg);
-
-void fp_t_construct(fp_t *r);
-void fp_t_destroy(fp_t *r);
-void fp_t_assign(fp_t *t, const fp_t v);
-void fp_t_print(fp_t f, int decimals);
-long fp_t_to_long(fp_t f);
-long double fp_t_to_ld(fp_t f);
-
-int to_fp_t(fp_t *r, const char* arg, char **endptr);
 
 #endif
 

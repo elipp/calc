@@ -1,7 +1,7 @@
 #include <string.h>
 #include "functions.h"
 #include "commands.h"
-#include "definitions.h"
+#include "fp_t.h"
 
 int valid_math_char(char c) {
 	static const char valid_math_chars[] = { '(', ')', '.', '+', '-', '*', '/', '^', '%', '_', '\0' }; 
@@ -45,37 +45,6 @@ void func_binary_or(fp_t *r, fp_t a, fp_t b) { *r = (long long)a|(long long)b; }
 void func_deg(fp_t *r, fp_t rad) { *r = (360.0L*rad)/(2*M_PI); }
 void func_rad(fp_t *r, fp_t deg) { *r = (2*M_PI*deg)/360.0L; }
 
-void fp_t_construct(fp_t *r) { *r = 0; }
-void fp_t_destroy(fp_t *r) { *r = 0; }
-
-void fp_t_print(fp_t f, int precision_figures) {
-	char fmt_buffer[64];
-	sprintf(fmt_buffer, "%%.%dLg", precision_figures);
-	printf(fmt_buffer, f);
-}
-
-long fp_t_to_long(fp_t f) {
-	return (long)f;
-}
-
-long double fp_t_to_ld(fp_t f) {
-	return f;
-}
-
-int to_fp_t(fp_t *r, const char* arg, char **endptr) {
-#ifdef LONG_DOUBLE_PRECISION
-	*r = strtold(arg, endptr);
-#else
-	*r = strtod(arg, endptr);
-#endif
-	return (*endptr == arg + strlen(arg));
-}
-
-void fp_t_assign(fp_t *r, const fp_t f) {
-	*r = f;
-}
-
-
 #elif USE_MPFR
 
 void f_add(fp_t *r, fp_t a, fp_t b) { 
@@ -104,7 +73,7 @@ void f_mod(fp_t *r, fp_t a, fp_t b) {
 
 void func_deg(fp_t *r, fp_t rad) { 
 	mpfr_t twopi;
-	mpfr_inits2(precision, twopi, *r, (mpfr_ptr)0);
+	mpfr_inits2(precision_bits, twopi, *r, (mpfr_ptr)0);
 	mpfr_mul_ui(*r, rad, 360, MPFR_RNDN);
 	mpfr_const_pi(twopi, MPFR_RNDN);
 	mpfr_mul_ui(twopi, twopi, 2, MPFR_RNDN);
@@ -114,7 +83,7 @@ void func_deg(fp_t *r, fp_t rad) {
 
 void func_rad(fp_t *r, fp_t deg) { 
 	mpfr_t twopi;
-	mpfr_inits2(precision, twopi, *r, (mpfr_ptr)0);
+	mpfr_inits2(precision_bits, twopi, *r, (mpfr_ptr)0);
 	mpfr_const_pi(twopi, MPFR_RNDN);
 	mpfr_mul(*r, deg, twopi, MPFR_RNDN);
 	mpfr_div_ui(*r, *r, 360, MPFR_RNDN);
@@ -123,43 +92,6 @@ void func_rad(fp_t *r, fp_t deg) {
 
 void func_factorial(fp_t* v, fp_t f) {
 	mpfr_fac_ui(*v, fp_t_to_long(f), MPFR_RNDN);
-}
-
-void fp_t_construct(fp_t *r) {
-	mpfr_init(*r);	// initialize to default precision (mpfr_set_precision)
-	mpfr_set_ui(*r, 0, MPFR_RNDZ);
-}
-
-void fp_t_destroy(fp_t *r) {
-	mpfr_clear(*r);
-}
-
-void fp_t_assign(fp_t *r, const fp_t v) {
-	mpfr_set(*r, v, MPFR_RNDN);
-}
-
-void fp_t_print(fp_t f, int precision_bits) {
-	char fmt_buffer[64];
-
-	const long double prec_coeff = logl(2)/logl(10);
-	int precision_digits = precision_bits * prec_coeff; // at maximum
-	precision_digits = precision_digits > 3 ? precision_digits - 3 : precision_digits;
-	sprintf(fmt_buffer, "%%.%dRg", precision_digits);
-
-	mpfr_printf(fmt_buffer, f);
-}
-
-long fp_t_to_long(fp_t f) {
-	return mpfr_get_si(f, MPFR_RNDN);	
-}
-
-long double fp_t_to_ld(fp_t f) {
-	return mpfr_get_ld(f, MPFR_RNDN);
-}
-
-int to_fp_t(fp_t *r, const char* arg, char **endptr) { 
-	mpfr_strtofr(*r, arg, endptr, 0, MPFR_RNDN);
-	return (*endptr == arg+strlen(arg));
 }
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef TABLES_H
 #define TABLES_H
 
-#include "definitions.h"
+#include "fp_t.h"
 
 typedef struct {
 	const char* key;

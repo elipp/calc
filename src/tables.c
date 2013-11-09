@@ -1,10 +1,11 @@
 #include <string.h>
+#include <stdlib.h>
 
-#include "definitions.h"
+#include "fp_t.h"
 #include "functions.h"
 #include "tables.h"
+#include "commands.h"
 
-extern int precision;
 
 #ifdef USE_MPFR
 #define MATH_WRAPPER(funcname) void cw_##funcname(fp_t *r, fp_t arg) { mpfr_##funcname(*r, arg, MPFR_RNDN); }
@@ -101,7 +102,7 @@ void setup_constants() {
 
 	#ifdef USE_MPFR
 	mpfr_t pi, e;
-	mpfr_inits2(precision, pi, e, (mpfr_ptr)0);
+	mpfr_inits2(precision_bits, pi, e, (mpfr_ptr)0);
 
 	mpfr_const_pi(pi, MPFR_RNDN);
 	mpfr_set_str(e, "2.71828182845904523536028747135266249775724709369995957496696762772407663\
@@ -156,7 +157,7 @@ int clashes_with_predefined(const char* arg) {
 	while (i < constants_table_size) {
 		if (strcmp(constants[i].key, arg) == 0) {
 			printf("my: error: operand varname clashes with predefined \"%s\" (value ", constants[i].key);
-			fp_t_print(constants[i].value, precision);
+			fp_t_print(constants[i].value, print_significant_figures);
 			puts(")\n");		
 			return 1;
 		}

@@ -5,7 +5,7 @@
 #include <sys/select.h>
 
 #include "rl_emul.h"
-#include "definitions.h"
+#include "fp_t.h"
 #include "termtree.h"
 #include "string_manip.h"
 #include "string_allocator.h"
@@ -64,12 +64,12 @@ static int read_stdin_piped_input(char** buffer) {
 
 static void report_result(fp_t r) {
 	fputs("\033[1;29m= ", stdout);
-	fp_t_print(r, precision);
+	fp_t_print(r, print_significant_figures);
 	fputs("\033[m\n", stdout);
 }
 
 static void report_result_plain(fp_t r) {
-	fp_t_print(r, precision);
+	fp_t_print(r, print_significant_figures);
 	fputc('\n', stdout);
 }
 
@@ -108,7 +108,7 @@ static void sig_handler(int signum) {
 int main(int argc, char* argv[]) {
 
 	signal(SIGINT, sig_handler);
-	set_precision(DEFAULT_PREC);
+	set_precision(significant_figures_max(PRECISION_BITS_INITIAL) - 3);
 	
 	setup_constants();
 	

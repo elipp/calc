@@ -1,5 +1,5 @@
 #include "ud_constants_tree.h"
-#include "definitions.h"
+#include "fp_t.h"
 #include "functions.h"
 
 // not implementing udc_tree as a struct, since there will only ever be 1 of them

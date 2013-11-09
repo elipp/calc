@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "definitions.h"
+#include "fp_t.h"
 #include "functions.h"
 #include "ud_constants_tree.h"
 #include "wlist.h"
@@ -34,6 +34,8 @@ void quit();
 
 extern const key_funcptr_pair commands[];
 extern const size_t commands_table_size;
-extern int precision;
+
+extern int precision_bits;
+extern int print_significant_figures;
 
 #endif
