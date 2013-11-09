@@ -16,7 +16,8 @@ int valid_math_char(char c) {
 	return found;
 }
 
-#ifndef USE_MPFR
+#ifdef LONG_DOUBLE_PRECISION
+
 void func_factorial(fp_t *r, fp_t a) {
 	
 	if ((long)a == 0) { *r = 1; return; }
@@ -75,8 +76,7 @@ void fp_t_assign(fp_t *r, const fp_t f) {
 }
 
 
-#else // USE_MPFR 
-
+#elif USE_MPFR
 
 void f_add(fp_t *r, fp_t a, fp_t b) { 
 	mpfr_add(*r, a, b, MPFR_RNDN);
@@ -141,11 +141,10 @@ void fp_t_assign(fp_t *r, const fp_t v) {
 void fp_t_print(fp_t f, int precision_bits) {
 	char fmt_buffer[64];
 
-	if (precision_bits == 0) sprintf(fmt_buffer, "%%.0Rf");
-	else { 
-		int precision_digits = precision_bits * (log(2)/log(10)) - 1;
-		sprintf(fmt_buffer, "%%.%dRg", precision_digits);
-	}
+	const long double prec_coeff = logl(2)/logl(10);
+	int precision_digits = precision_bits * prec_coeff; // at maximum
+	precision_digits = precision_digits > 3 ? precision_digits - 3 : precision_digits;
+	sprintf(fmt_buffer, "%%.%dRg", precision_digits);
 
 	mpfr_printf(fmt_buffer, f);
 }

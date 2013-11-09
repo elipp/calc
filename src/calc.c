@@ -22,10 +22,9 @@ static const char* prec_config = "long double as fp_t";
 
 #else
 static const char* prec_config = "double as fp_t";
-
 #endif
-static const char* rl_config = "bundled rl_emul";
 
+static const char* rl_config = "bundled rl_emul";
 static const char* version_string = "0.1.1a";
 
 extern int quit_signal;

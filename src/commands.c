@@ -245,16 +245,18 @@ void set(struct wlist_t *wlist) {
 void set_precision(long prec) {
 
 	if (prec < 1) { printf("set precision: error: precision requested < 1\n"); return; }
+
 	#ifdef USE_MPFR
 	mpfr_set_default_prec(prec);
+
 	#elif LONG_DOUBLE_PRECISION
 	if (prec > DEFAULT_PREC) { 
 		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", DEFAULT_PREC); 
 		if (prec > 56) { prec = 50; printf("Clamped precision to 50 decimal places.\n"); }
 	}
-	precision = prec;
-
 	#endif
+
+	precision = prec;
 }
 
 void quit() {
