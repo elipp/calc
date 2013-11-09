@@ -45,7 +45,7 @@ void my(struct wlist_t *wlist) {
 	struct wlist_t retokenized = wlist_generate(recomposed, "=");
 
 	if (retokenized.num_words != 2) { 
-		printf("my: error: exactly 1 \'=\' expected (got %d). See \"help my\".\n", retokenized.num_words); 
+		fprintf(stderr, "my: error: exactly 1 \'=\' expected (got %d). See \"help my\".\n", retokenized.num_words-1); 
 		wlist_destroy(&retokenized);
 		sa_free(recomposed);
 		return;
@@ -218,14 +218,14 @@ The \"set\" command can be used to control calc's inner workings. Available subc
 
 void set(struct wlist_t *wlist) {
 	if (wlist->num_words < 2) {
-		printf("\nset: error: expected subcommand, none supplied\n");
+		fprintf(stderr, "set: error: expected subcommand, none supplied\n");
 		return;
 	}
 
 	char *subcommand = wlist->strings[1];
 	if (strcmp(subcommand, "precision") == 0) {
 		if (wlist->num_words < 3) { 
-			printf("\nset precision: error: numerical argument expected.\n");
+			fprintf(stderr, "set precision: error: numerical argument expected.\n");
 			return;
 		}
 		char* precstring = wlist->strings[2];
@@ -246,7 +246,7 @@ void set(struct wlist_t *wlist) {
 
 void set_precision(long significant_figures) {
 
-	if (significant_figures < 1) { printf("set precision: error: precision requested < 1\n"); return; }
+	if (significant_figures < 1) { fprintf(stderr, "set precision: error: precision requested < 1\n"); return; }
 
 	#ifdef USE_MPFR
 	int bits = ((minimum_bits_for_significant_figures(significant_figures)/128)+1)*128; 
@@ -256,7 +256,7 @@ void set_precision(long significant_figures) {
 	#else
 	int max_significant_figures = significant_figures_max(PRECISION_BITS_INITIAL);
 	if (significant_figures > max_significant_figures) { 
-		printf("set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", max_significant_figures); 
+		fprintf(stderr, "set precision: \033[1;31mwarning: incorrect decimals will almost certainly be included (p > %d)\033[m\n", max_significant_figures); 
 	}
 	#endif
 
