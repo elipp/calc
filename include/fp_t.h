@@ -4,11 +4,11 @@
 #ifdef USE_MPFR
 #include <mpfr.h>
 typedef mpfr_t fp_t;
-#define PRECISION_BITS_INITIAL 256	// this is actually 256 bits of precision, not significant figures
+#define PRECISION_BITS_INITIAL 256	// 256-bit significand
 
 #elif LONG_DOUBLE_PRECISION
 typedef long double fp_t;
-#define PRECISION_BITS_INITIAL 107	// including the implicit bit. this is actually only 80 bits on x86
+#define PRECISION_BITS_INITIAL 107	// including the implicit bit. this is actually only 80 bits on x86_32 glibc, despite 128-bit data type width
 
 #else
 typedef double fp_t;

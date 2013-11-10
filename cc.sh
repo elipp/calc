@@ -6,8 +6,8 @@ CALC_SOURCES=$(find ./src -maxdepth 1 -type f)
 RT_SOURCES=$(find ./src -type f | grep -vF -e 'calc.c' -e 'memusage.c')
 #MU_SOURCES=$(find ./src -type f | grep -vF -e 'calc.c' -e 'result_test.c')
 
-#CC="clang -g -Wall -lm"
-CC="clang -g -Wall -lm -lmpfr -lgmp"
+#CC="clang -O2 -Wall -lm"
+CC="clang -O2 -Wall -lm -lmpfr -lgmp"
 #CC="clang -g -Wall -lm -lreadline"
 
 INCLUDE="-I./include/"

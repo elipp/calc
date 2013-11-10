@@ -8,14 +8,25 @@
 
 
 #ifdef USE_MPFR
-#define MATH_WRAPPER(funcname) void cw_##funcname(fp_t *r, fp_t arg) { mpfr_##funcname(*r, arg, MPFR_RNDN); }
-#define MATH_WRAPPER_EXPLICIT(mpfr_name, funcname) void cw_##funcname(fp_t *r, fp_t arg) { mpfr_##mpfr_name(*r, arg, MPFR_RNDN); }
+
+#define MATH_WRAPPER(funcname)\
+static void cw_##funcname(fp_t *r, fp_t arg) { mpfr_##funcname(*r, arg, MPFR_RNDN); }
+
+#define MATH_WRAPPER_EXPLICIT(mpfr_name, funcname)\
+static void cw_##funcname(fp_t *r, fp_t arg) { mpfr_##mpfr_name(*r, arg, MPFR_RNDN); }
+
 #else
 
 #ifdef LONG_DOUBLE_PRECISION
-#define MATH_WRAPPER(funcname) void cw_##funcname(fp_t *r, fp_t arg) { *r = funcname##l(arg); }
+
+#define MATH_WRAPPER(funcname)\
+static void cw_##funcname(fp_t *r, fp_t arg) { *r = funcname##l(arg); }
+
 #else
-#define MATH_WRAPPER(funcname) void cw_##funcname(fp_t *r, fp_t arg) { *r = funcname(arg); }
+
+#define MATH_WRAPPER(funcname)\
+static void cw_##funcname(fp_t *r, fp_t arg) { *r = funcname(arg); }
+
 #endif // LONG_DOUBLE_PRECISION
 
 #endif // USE_MPFR
@@ -65,6 +76,7 @@ const key_mathfuncptr_pair functions[] = {
 	KMPSTD("atan", atan),
 	KMPSTD("exp", exp), 
 	KMPSTD("ln", log), 
+	KMPSTD("log", log), 
 	KMPSTD("log2", log2), 
 	KMPSTD("log10", log10),
 	KMPSTD("sqrt", sqrt), 

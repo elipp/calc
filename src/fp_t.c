@@ -4,7 +4,7 @@
 #include "commands.h"
 
 static const long double significant_f_coeff = 0.30102999566398119521L;	// log_n(2)/log_n(10)
-static const long double bit_coeff = 1.0/significant_f_coeff;
+static const long double bit_coeff = 1.0/0.30102999566398119521L;
 
 int significant_figures_max(int precision_bits) {
 	int precision_digits = precision_bits * significant_f_coeff; // at maximum
