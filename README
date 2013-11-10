@@ -1,5 +1,3 @@
 calc:
 
-A command-line calculator with a interactive user interface. Written in C.
-
-Copyright : everybody.
+A multiple-precision (via GNU MPFR) command-line calculator with an interactive user interface. Written in C.
