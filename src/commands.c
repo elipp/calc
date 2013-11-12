@@ -241,6 +241,9 @@ void set(struct wlist_t *wlist) {
 		}
 		fp_t_destroy(&prec_val);
 	}
+	else {
+		fprintf(stderr, "set: unknown subcommand \"%s\"!\n", subcommand);
+	}
 
 }
 
